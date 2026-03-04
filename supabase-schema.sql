@@ -67,3 +67,27 @@ alter table public.config enable row level security;
 -- Insertar fila inicial (ajusta los valores que quieras)
 insert into public.config (id, admin_token, scanner_pin) values (1, 'admin123', '1234')
 on conflict (id) do nothing;
+
+-- STORAGE: bucket para fotos de estudiantes
+-- Ejecutar en Supabase Dashboard > Storage > New Bucket
+-- Nombre: student-photos, Public: true
+-- O ejecutar esto en SQL Editor:
+insert into storage.buckets (id, name, public)
+values ('student-photos', 'student-photos', true)
+on conflict (id) do nothing;
+
+-- Política: permitir subir y leer fotos (service role lo maneja desde la API)
+create policy "Public read student photos"
+  on storage.objects for select
+  using ( bucket_id = 'student-photos' );
+
+create policy "Service role upload student photos"
+  on storage.objects for insert
+  with check ( bucket_id = 'student-photos' );
+
+create policy "Service role delete student photos"
+  on storage.objects for delete
+  using ( bucket_id = 'student-photos' );
+
+-- Agregar columna foto a estudiantes (si no existe)
+alter table public.students add column if not exists photo_url text;

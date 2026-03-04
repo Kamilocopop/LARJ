@@ -213,24 +213,17 @@
       <button class="btn-sm btn-danger-sm" onclick="resetAttendance()">🗑 Resetear asistencias</button>
     </div>
     <div class="stats-grid" style="grid-template-columns:repeat(auto-fit,minmax(160px,1fr));margin-bottom:24px">
-      <div class="stat-card blue"><div class="stat-label">Sesiones dictadas</div><div class="stat-value" id="r-sessions">—</div></div>
-      <div class="stat-card green"><div class="stat-label">Registros totales</div><div class="stat-value" id="r-records">—</div></div>
-      <div class="stat-card gold"><div class="stat-label">% Promedio</div><div class="stat-value" id="r-avg">—</div></div>
+      <div class="stat-card green"><div class="stat-label">Total asistencias</div><div class="stat-value" id="r-records">—</div><div class="stat-sub">registros acumulados</div></div>
+      <div class="stat-card gold"><div class="stat-label">Promedio</div><div class="stat-value" id="r-avg">—</div><div class="stat-sub">asistencias por estudiante</div></div>
     </div>
     <div class="section-title">Ranking de asistencia</div>
     <div class="table-wrap">
       <table>
-        <thead><tr><th>Pos.</th><th>Estudiante</th><th>Grupo</th><th>Asistencias</th><th>%</th><th>Estado</th></tr></thead>
+        <thead><tr><th>Pos.</th><th>Estudiante</th><th>Grupo</th><th>Días asistidos</th><th>Estado</th></tr></thead>
         <tbody id="report-tbody"></tbody>
       </table>
     </div>
-    <div class="section-title" style="margin-top:28px">Historial de sesiones</div>
-    <div class="table-wrap">
-      <table>
-        <thead><tr><th>Sesión</th><th>Apertura</th><th>Cierre</th><th>Estado</th></tr></thead>
-        <tbody id="sessions-tbody"></tbody>
-      </table>
-    </div>
+
   </div>
 
   <!-- CONFIG -->
@@ -267,6 +260,9 @@
 
 
 </div>
+
+<!-- FILE INPUT OCULTO -->
+<input type="file" id="photo-input" accept="image/*" style="display:none" onchange="uploadPhoto(this)">
 
 <!-- QR MODAL -->
 <div id="qr-modal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.7);z-index:200;align-items:center;justify-content:center;backdrop-filter:blur(4px)">
@@ -404,15 +400,19 @@ function renderStudents(filter='') {
     const init = (s.nombres[0]+(s.apellidos[0]||'')).toUpperCase();
     const col  = colors[s.id.charCodeAt(s.id.length-1)%colors.length];
     const pres = presentToday.has(s.id);
+    const avatarHtml = s.photo_url
+      ? `<img src="${s.photo_url}" style="width:30px;height:30px;border-radius:7px;object-fit:cover;flex-shrink:0">`
+      : `<div class="avatar" style="background:${col}">${init}</div>`;
     return `<tr>
       <td><div class="student-cell">
-        <div class="avatar" style="background:${col}">${init}</div>
+        ${avatarHtml}
         <div><strong style="font-size:13px">${s.nombres} ${s.apellidos}</strong><br><small style="color:var(--muted);font-family:'DM Mono',monospace;font-size:10px">${s.id.slice(0,8)}…</small></div>
       </div></td>
       <td style="font-family:'DM Mono',monospace;font-size:12px;color:var(--muted)">${s.codigo||'—'}</td>
       <td><span style="padding:2px 9px;border-radius:20px;font-size:11px;background:var(--surface2);border:1px solid var(--border);color:var(--muted)">${s.grupo||'—'}</span></td>
       <td>${pres?'<span class="badge badge-green">✓ Presente</span>':'<span class="badge badge-red">✗ Ausente</span>'}</td>
       <td><div style="display:flex;gap:6px">
+        <button class="btn-sm" onclick="triggerPhotoUpload('${s.id}')">📷</button>
         <button class="btn-sm" onclick="showQR('${s.id}','${s.nombres} ${s.apellidos}','${s.codigo||''}')">QR</button>
         <button class="btn-sm btn-danger-sm" onclick="deleteStudent('${s.id}','${s.nombres} ${s.apellidos}')">✕</button>
       </div></td>
@@ -566,7 +566,9 @@ function renderRecentLog(recent) {
   c.innerHTML = `<div class="timeline">${recent.map(r=>{
     const s = r.students;
     return `<div class="tl-item">
-      <div class="tl-dot"></div>
+      ${r.students?.photo_url
+        ? `<img src="${r.students.photo_url}" style="width:28px;height:28px;border-radius:6px;object-fit:cover;flex-shrink:0">`
+        : '<div class="tl-dot"></div>'}
       <div class="tl-time">${r.time}</div>
       <div><div class="tl-name">${s?`${s.nombres} ${s.apellidos}`:'—'}</div>
       <div class="tl-detail">${fmtDate(r.date)} · QR</div></div>
@@ -577,57 +579,43 @@ function renderRecentLog(recent) {
 
 // ─── REPORTS ─────────────────────────────────────────
 function renderReports() {
-  // Stats sesiones
-  document.getElementById('r-sessions').textContent = sessions.length;
-  document.getElementById('r-records').textContent  = attendance.length;
-
-  // Construir summary por estudiante
+  // Contar asistencias por estudiante (días únicos)
   const attByStudent = {};
   attendance.forEach(r => {
-    if (!attByStudent[r.student_id]) attByStudent[r.student_id] = 0;
-    attByStudent[r.student_id]++;
+    if (!attByStudent[r.student_id]) attByStudent[r.student_id] = new Set();
+    attByStudent[r.student_id].add(r.date);
   });
 
   const summary = students.map(s => ({
     ...s,
-    attended: attByStudent[s.id] || 0,
-    pct: sessions.length > 0 ? Math.round(((attByStudent[s.id]||0)/sessions.length)*100) : 0,
-  })).sort((a,b)=>b.attended-a.attended);
+    attended: attByStudent[s.id] ? attByStudent[s.id].size : 0,
+  })).sort((a,b) => b.attended - a.attended);
 
-  const avg = summary.length ? Math.round(summary.reduce((a,s)=>a+s.pct,0)/summary.length) : 0;
-  document.getElementById('r-avg').textContent = avg + '%';
+  const totalRecords = attendance.length;
+  const avg = summary.length ? (summary.reduce((a,s) => a + s.attended, 0) / summary.length).toFixed(1) : 0;
 
-  // Ranking
-  const medals=['🥇','🥈','🥉'];
-  const tbody = document.getElementById('report-tbody');
+  document.getElementById('r-records').textContent = totalRecords;
+  document.getElementById('r-avg').textContent     = avg;
+
+  const medals = ['🥇','🥈','🥉'];
+  const tbody  = document.getElementById('report-tbody');
+
   if (!summary.length) {
-    tbody.innerHTML='<tr><td colspan="6"><div class="empty"><div class="icon">📈</div><p>Agrega estudiantes.</p></div></td></tr>';
-  } else {
-    tbody.innerHTML = summary.map((s,i)=>{
-      const [bg,tc,st] = s.pct>=80?['badge-green','','✓ Regular']:s.pct>=50?['badge-gold','','⚠ En riesgo']:['badge-red','','✗ Crítico'];
-      return `<tr>
-        <td style="font-size:18px">${medals[i]||'#'+(i+1)}</td>
-        <td><strong>${s.nombres} ${s.apellidos}</strong><br><small style="color:var(--muted);font-family:'DM Mono',monospace;font-size:10px">${s.codigo||''}</small></td>
-        <td><span style="padding:2px 9px;border-radius:20px;font-size:11px;background:var(--surface2);border:1px solid var(--border);color:var(--muted)">${s.grupo||'—'}</span></td>
-        <td><span class="badge badge-blue">${s.attended}${sessions.length?' / '+sessions.length:''}</span></td>
-        <td><div class="bar-wrap"><div class="bar-bg"><div class="bar-fill" style="width:${s.pct}%"></div></div><span style="font-family:'DM Mono',monospace;font-size:11px;color:var(--muted);width:36px;text-align:right">${s.pct}%</span></div></td>
-        <td><span class="badge ${bg}">${st}</span></td>
-      </tr>`;
-    }).join('');
+    tbody.innerHTML = '<tr><td colspan="5"><div class="empty"><div class="icon">📈</div><p>Agrega estudiantes para ver el ranking.</p></div></td></tr>';
+    return;
   }
 
-  // Sessions table
-  const stbody = document.getElementById('sessions-tbody');
-  if (!sessions.length) {
-    stbody.innerHTML='<tr><td colspan="4"><div class="empty"><div class="icon">📅</div><p>Sin sesiones aún.</p></div></td></tr>';
-  } else {
-    stbody.innerHTML = sessions.map(s=>`<tr>
-      <td><strong>${s.name}</strong></td>
-      <td style="font-family:'DM Mono',monospace;font-size:11px;color:var(--muted)">${fmtDT(s.opened_at)}</td>
-      <td style="font-family:'DM Mono',monospace;font-size:11px;color:var(--muted)">${s.closed_at?fmtDT(s.closed_at):'—'}</td>
-      <td>${s.active?'<span class="badge badge-green">🟢 Activa</span>':'<span class="badge" style="background:var(--surface2);color:var(--muted)">Cerrada</span>'}</td>
-    </tr>`).join('');
-  }
+  tbody.innerHTML = summary.map((s, i) => {
+    const [bg, st] = s.attended > 0 ? ['badge-green', '✓ Asistió'] : ['badge-red', '✗ Sin asistencias'];
+    return `<tr>
+      <td style="font-size:18px">${medals[i] || '#'+(i+1)}</td>
+      <td><strong>${s.nombres} ${s.apellidos}</strong><br>
+          <small style="color:var(--muted);font-family:'DM Mono',monospace;font-size:10px">${s.codigo||''}</small></td>
+      <td><span style="padding:2px 9px;border-radius:20px;font-size:11px;background:var(--surface2);border:1px solid var(--border);color:var(--muted)">${s.grupo||'—'}</span></td>
+      <td><span class="badge badge-blue" style="font-size:14px;padding:4px 12px">${s.attended} ${s.attended === 1 ? 'día' : 'días'}</span></td>
+      <td><span class="badge ${bg}">${st}</span></td>
+    </tr>`;
+  }).join('');
 }
 
 function exportReportCSV() {
@@ -711,6 +699,44 @@ async function saveConfig(type) {
       showToast('⚠', d.error || 'Error','err');
     }
   }
+}
+
+
+let currentUploadStudentId = null;
+
+function triggerPhotoUpload(studentId) {
+  currentUploadStudentId = studentId;
+  document.getElementById('photo-input').value = '';
+  document.getElementById('photo-input').click();
+}
+
+async function uploadPhoto(input) {
+  if (!input.files || !input.files[0]) return;
+  const file = input.files[0];
+  if (file.size > 2 * 1024 * 1024) { showToast('⚠','La foto no debe superar 2MB','err'); return; }
+
+  showToast('⏳','Subiendo foto…','ok');
+
+  const reader = new FileReader();
+  reader.onload = async (e) => {
+    const base64 = e.target.result.split(',')[1];
+    const res = await fetch('/api/upload/photo', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'x-admin-token': TOKEN },
+      body: JSON.stringify({ studentId: currentUploadStudentId, imageBase64: base64, mimeType: file.type })
+    });
+    const data = await res.json();
+    if (res.ok) {
+      // Actualizar foto en memoria
+      const idx = students.findIndex(s => s.id === currentUploadStudentId);
+      if (idx >= 0) students[idx].photo_url = data.photo_url;
+      renderStudents();
+      showToast('✅','Foto actualizada','ok');
+    } else {
+      showToast('⚠', data.error || 'Error al subir foto','err');
+    }
+  };
+  reader.readAsDataURL(file);
 }
 
 async function resetAttendance() {

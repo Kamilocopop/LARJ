@@ -189,8 +189,10 @@
 
       if (res.ok) {
         setResult('success', '✅', `${data.student.nombres} ${data.student.apellidos}`, `Asistencia registrada · ${data.time}`);
+        if (data.student.photo_url) showPhotoOverlay(data.student, '✅ Asistencia registrada · ' + data.time);
       } else if (res.status === 409) {
         setResult('duplicate', '⚠️', 'Ya registrado', data.error);
+        if (data.student?.photo_url) showPhotoOverlay(data.student, '⚠ Ya registró asistencia hoy');
       } else if (res.status === 400) {
         setResult('error', '🔴', 'Sesión cerrada', data.error);
       } else {
@@ -199,6 +201,29 @@
     } catch {
       setResult('error', '❌', 'Sin conexión', 'Verifica la red e intenta de nuevo');
     }
+  }
+
+
+  function showPhotoOverlay(student, detail) {
+    const overlay = document.getElementById('photo-overlay');
+    document.getElementById('overlay-photo').src  = student.photo_url;
+    document.getElementById('overlay-name').textContent   = student.nombres + ' ' + student.apellidos;
+    document.getElementById('overlay-detail').textContent = detail;
+    overlay.style.display = 'flex';
+
+    // Reset y animar barra
+    const bar = document.getElementById('overlay-bar');
+    bar.style.transition = 'none';
+    bar.style.width = '100%';
+    setTimeout(() => {
+      bar.style.transition = 'width 3s linear';
+      bar.style.width = '0%';
+    }, 50);
+
+    setTimeout(() => { overlay.style.display = 'none'; }, 3000);
+
+    // Clic para cerrar antes
+    overlay.onclick = () => { overlay.style.display = 'none'; };
   }
 
   function setResult(type, icon, name, detail) {
@@ -218,5 +243,22 @@
   const savedPin = sessionStorage.getItem('scanner_pin');
   if (savedPin) { pin = savedPin; openScanner(); }
 </script>
+
+<!-- FOTO OVERLAY -->
+<div id="photo-overlay" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.92);z-index:300;flex-direction:column;align-items:center;justify-content:center;animation:fadeIn .2s ease">
+  <img id="overlay-photo" src="" style="width:260px;height:260px;border-radius:20px;object-fit:cover;border:4px solid #3fb950;box-shadow:0 0 40px rgba(63,185,80,0.4)">
+  <div style="margin-top:20px;text-align:center">
+    <p id="overlay-name" style="font-family:'DM Serif Display',serif;font-size:26px;color:#fff;margin-bottom:6px"></p>
+    <p id="overlay-detail" style="font-family:'DM Mono',monospace;font-size:13px;color:#3fb950"></p>
+  </div>
+  <div style="margin-top:24px;width:260px;height:4px;background:#21262d;border-radius:2px;overflow:hidden">
+    <div id="overlay-bar" style="height:100%;background:#3fb950;border-radius:2px;width:100%;transition:width 3s linear"></div>
+  </div>
+</div>
+
+<style>
+@keyframes fadeIn{from{opacity:0}to{opacity:1}}
+</style>
+
 </body>
 </html>
