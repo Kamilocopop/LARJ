@@ -270,13 +270,13 @@
   <div style="background:var(--surface);border:1px solid var(--border);border-radius:16px;padding:32px;width:100%;max-width:400px;position:relative;animation:fadeUp .25s ease">
     <button onclick="closeQR()" style="position:absolute;top:14px;right:14px;background:var(--surface2);border:1px solid var(--border);color:var(--muted);width:28px;height:28px;border-radius:6px;cursor:pointer;font-size:14px">✕</button>
     <h3 style="font-family:'DM Serif Display',serif;font-size:20px;margin-bottom:4px">Código QR</h3>
-    <p id="qr-name" style="color:var(--muted);font-size:13px;margin-bottom:20px"></p>
+    <p id="qr-name" style="color:var(--muted);font-size:13px;margin-bottom:16px"></p>
+    <!-- Foto del estudiante -->
+    <div id="qr-photo-wrap" style="display:none;justify-content:center;margin-bottom:14px">
+      <img id="qr-photo" src="" style="width:72px;height:72px;border-radius:50%;object-fit:cover;border:3px solid var(--accent)">
+    </div>
     <div style="background:#fff;border-radius:12px;padding:16px;display:flex;justify-content:center;margin-bottom:16px">
       <div id="qr-canvas" style="display:flex;justify-content:center;align-items:center"></div>
-    </div>
-    <div style="background:var(--surface2);border:1px solid var(--border);border-radius:8px;padding:10px 14px;display:flex;justify-content:space-between;align-items:center;margin-bottom:16px">
-      <span style="font-size:11px;font-family:'DM Mono',monospace;color:var(--muted)">ID único</span>
-      <span id="qr-id" style="font-size:11px;font-family:'DM Mono',monospace;color:var(--accent)"></span>
     </div>
     <div style="display:flex;gap:10px">
       <button onclick="printQR()" style="flex:1;background:var(--accent);color:#0d1117;border:none;border-radius:8px;padding:11px;font-family:'DM Sans',sans-serif;font-weight:600;font-size:13px;cursor:pointer">🖨 Imprimir</button>
@@ -414,7 +414,7 @@ function renderStudents(filter='') {
       <td>${pres?'<span class="badge badge-green">✓ Presente</span>':'<span class="badge badge-red">✗ Ausente</span>'}</td>
       <td><div style="display:flex;gap:6px">
         <button class="btn-sm" onclick="triggerPhotoUpload('${s.id}')">📷</button>
-        <button class="btn-sm" onclick="showQR('${s.id}','${s.nombres} ${s.apellidos}','${s.codigo||''}')">QR</button>
+        <button class="btn-sm" onclick="showQR('${s.id}','${s.nombres} ${s.apellidos}','${s.codigo||''}','${s.photo_url||''}')">QR</button>
         <button class="btn-sm btn-danger-sm" onclick="deleteStudent('${s.id}','${s.nombres} ${s.apellidos}')">✕</button>
       </div></td>
     </tr>`;
@@ -469,11 +469,19 @@ function exportStudentsCSV() {
 // ─── QR ──────────────────────────────────────────────
 let currentQR = null;
 
-function showQR(id, name, codigo) {
+function showQR(id, name, codigo, photoUrl) {
   currentQR = { id, name, codigo };
-  document.getElementById('qr-name').textContent = `${name}${codigo?' · '+codigo:''}`;
-  document.getElementById('qr-id').textContent   = id;
+  document.getElementById('qr-name').textContent = name + (codigo ? ' · ' + codigo : '');
   drawQR(id);
+  // Mostrar foto si existe
+  const wrap  = document.getElementById('qr-photo-wrap');
+  const photo = document.getElementById('qr-photo');
+  if (photoUrl) {
+    photo.src          = photoUrl;
+    wrap.style.display = 'flex';
+  } else {
+    wrap.style.display = 'none';
+  }
   document.getElementById('qr-modal').style.display = 'flex';
 }
 
