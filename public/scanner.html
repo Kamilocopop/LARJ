@@ -153,16 +153,37 @@
     // If came from QR direct link
     if (directId) {
       await registerAttendance(directId);
-      return;
     }
 
-    // Start camera scanner
-    scanner = new Html5QrcodeScanner('reader', { fps: 10, qrbox: { width: 260, height: 260 }, aspectRatio: 1.0 }, false);
-    scanner.render(async (decoded) => {
+    // Start camera scanner (Html5Qrcode directo - más confiable)
+    const html5Qrcode = new Html5Qrcode('reader');
+    scanner = html5Qrcode;
+
+    // Buscar cámara trasera primero
+    let cameraId = null;
+    try {
+      const devices = await Html5Qrcode.getCameras();
+      if (devices && devices.length > 0) {
+        // Preferir cámara trasera
+        const back = devices.find(d => /back|rear|environment/i.test(d.label));
+        cameraId = back ? back.id : devices[devices.length - 1].id;
+      }
+    } catch {}
+
+    const config = {
+      fps: 15,
+      qrbox: (w, h) => {
+        const size = Math.min(w, h) * 0.7;
+        return { width: size, height: size };
+      },
+      aspectRatio: 1.0,
+      experimentalFeatures: { useBarCodeDetectorIfSupported: true }
+    };
+
+    const onSuccess = async (decoded) => {
       if (locked) return;
       locked = true;
 
-      // Puede ser URL completa o solo UUID
       let studentId = decoded;
       try {
         const u = new URL(decoded);
@@ -173,8 +194,23 @@
       setTimeout(() => {
         locked = false;
         setResult('idle', '⏳', 'Listo para el siguiente', 'Apunta la cámara al QR');
-      }, 2800);
-    }, () => {});
+      }, 3000);
+    };
+
+    try {
+      if (cameraId) {
+        await html5Qrcode.start({ deviceId: { exact: cameraId } }, config, onSuccess, () => {});
+      } else {
+        await html5Qrcode.start({ facingMode: 'environment' }, config, onSuccess, () => {});
+      }
+    } catch {
+      // Fallback a cualquier cámara
+      try {
+        await html5Qrcode.start({ facingMode: 'user' }, config, onSuccess, () => {});
+      } catch (err) {
+        setResult('error', '❌', 'Sin acceso a cámara', 'Permite el acceso a la cámara en tu navegador');
+      }
+    }
   }
 
   async function registerAttendance(studentId) {
@@ -235,7 +271,7 @@
   }
 
   function closeScanner() {
-    if (scanner) { scanner.clear().catch(()=>{}); scanner = null; }
+    if (scanner) { scanner.stop().catch(()=>{}); scanner = null; }
     window.location.href = '/index.html';
   }
 
