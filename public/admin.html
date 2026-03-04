@@ -151,8 +151,8 @@
       <div class="stat-card gold"><div class="stat-label">% Asistencia</div><div class="stat-value" id="s-pct">—</div><div class="stat-sub">hoy</div></div>
     </div>
     <div id="no-session-banner" class="banner" style="display:none">
-      <div><p>⚠ No hay sesión activa</p><small>Los estudiantes no podrán registrar asistencia hasta que abras una sesión.</small></div>
-      <span style="font-size:11px;color:var(--muted)">Usa el botón "Sesión cerrada" arriba</span>
+      <div><p>⚠ Escaneo apagado</p><small>El estudiante encargado no podrá registrar asistencia hasta que actives el escaneo.</small></div>
+      <span style="font-size:11px;color:var(--muted)">Usa el botón de arriba para activar</span>
     </div>
     <div class="section-title">Actividad reciente</div>
     <div class="table-wrap"><div id="recent-log"><div class="empty"><div class="icon">📭</div><p>Cargando…</p></div></div></div>
@@ -208,7 +208,8 @@
   <div id="tab-reports" class="tab">
     <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:12px;margin-bottom:24px">
       <div class="page-header" style="margin:0"><h2>Reportes</h2><p>Estadísticas acumuladas</p></div>
-      <button class="btn-sm" onclick="exportReportCSV()">⬇ Exportar reporte CSV</button>
+      <button class="btn-sm" onclick="exportReportCSV()">⬇ Exportar CSV</button>
+      <button class="btn-sm btn-danger-sm" onclick="resetAttendance()">🗑 Resetear asistencias</button>
     </div>
     <div class="stats-grid" style="grid-template-columns:repeat(auto-fit,minmax(160px,1fr));margin-bottom:24px">
       <div class="stat-card blue"><div class="stat-label">Sesiones dictadas</div><div class="stat-value" id="r-sessions">—</div></div>
@@ -329,11 +330,11 @@ function updateSessionBtn() {
   const banner = document.getElementById('no-session-banner');
   if (activeSession) {
     btn.classList.add('on');
-    lbl.textContent = `Sesión: ${activeSession.name}`;
+    lbl.textContent = '🟢 Escaneo activo';
     banner.style.display = 'none';
   } else {
     btn.classList.remove('on');
-    lbl.textContent = 'Sesión cerrada';
+    lbl.textContent = '⚫ Escaneo apagado';
     banner.style.display = 'flex';
   }
 }
@@ -342,13 +343,12 @@ async function toggleSession() {
   if (activeSession) {
     await DEL('/api/sessions');
     activeSession = null;
-    showToast('🔒','Sesión cerrada','ok');
+    showToast('🔒','Escaneo desactivado','ok');
   } else {
-    const name = prompt('Nombre de la sesión (ej: Clase 1):', 'Clase') || 'Clase';
-    const res  = await POST('/api/sessions', { name });
+    const res  = await POST('/api/sessions', { name: 'Clase' });
     const data = await res.json();
     activeSession = data;
-    showToast('✅','Sesión abierta: ' + data.name,'ok');
+    showToast('✅','Escaneo activado','ok');
   }
   updateSessionBtn();
   await loadAll();
@@ -641,6 +641,28 @@ function downloadCSV(rows,filename) {
 function logout() { localStorage.removeItem('admin_token'); window.location.href='/index.html'; }
 
 init();
+
+async function resetAttendance() {
+  const confirmText = prompt('Para confirmar escribe la palabra RESETEAR:');
+  if (confirmText !== 'RESETEAR') {
+    if (confirmText !== null) showToast('⚠','Texto incorrecto. No se reseteó nada.','err');
+    return;
+  }
+  const res  = await POST('/api/attendance/reset', {});
+  const data = await res.json();
+  if (res.ok) {
+    attendance = [];
+    renderAttendance();
+    renderReports();
+    document.getElementById('s-present').textContent = '0';
+    document.getElementById('s-absent').textContent  = document.getElementById('s-total').textContent;
+    document.getElementById('s-pct').textContent     = '0%';
+    renderRecentLog([]);
+    showToast('🗑','Asistencias reseteadas correctamente','ok');
+  } else {
+    showToast('⚠', data.error || 'Error al resetear','err');
+  }
+}
 </script>
 </body>
 </html>
