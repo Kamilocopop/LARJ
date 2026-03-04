@@ -1,0 +1,222 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>AsistenciaPro — Escáner QR</title>
+<link href="https://fonts.googleapis.com/css2?family=DM+Serif+Display&family=DM+Mono:wght@400;500&family=DM+Sans:wght@300;400;500;600&display=swap" rel="stylesheet">
+<!-- Librería QR scanner -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/html5-qrcode/2.3.8/html5-qrcode.min.js"></script>
+<style>
+  *{margin:0;padding:0;box-sizing:border-box}
+  :root{--bg:#0d1117;--surface:#161b22;--surface2:#21262d;--border:#30363d;--accent:#3fb950;--blue:#58a6ff;--danger:#f78166;--gold:#d29922;--muted:#8b949e;--text:#e6edf3}
+  body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--text);min-height:100vh;display:flex;align-items:center;justify-content:center;padding:16px}
+  body::before{content:'';position:fixed;inset:0;background-image:linear-gradient(rgba(63,185,80,0.04) 1px,transparent 1px),linear-gradient(90deg,rgba(63,185,80,0.04) 1px,transparent 1px);background-size:40px 40px;pointer-events:none}
+
+  /* PIN SCREEN */
+  #pin-screen{position:relative;z-index:1;width:100%;max-width:420px}
+  .card{background:var(--surface);border:1px solid var(--border);border-radius:16px;padding:40px;box-shadow:0 0 60px rgba(88,166,255,.06)}
+  .logo{display:flex;align-items:center;gap:12px;margin-bottom:28px}
+  .logo-icon{width:44px;height:44px;background:linear-gradient(135deg,#58a6ff,#2563eb);border-radius:10px;display:flex;align-items:center;justify-content:center;font-size:22px}
+  .logo h1{font-family:'DM Serif Display',serif;font-size:20px;line-height:1}
+  .logo span{font-size:11px;color:var(--muted);font-family:'DM Mono',monospace;letter-spacing:.08em;text-transform:uppercase}
+  h2{font-family:'DM Serif Display',serif;font-size:26px;margin-bottom:5px}
+  .sub{color:var(--muted);font-size:13px;margin-bottom:24px}
+  .error-box{background:rgba(247,129,102,.1);border:1px solid rgba(247,129,102,.3);color:var(--danger);border-radius:8px;padding:10px 14px;font-size:13px;margin-bottom:14px;display:none}
+  label{display:block;font-size:10px;font-family:'DM Mono',monospace;text-transform:uppercase;letter-spacing:.06em;color:var(--muted);margin-bottom:8px}
+  input[type=password]{width:100%;background:var(--bg);border:1px solid var(--border);border-radius:8px;padding:14px;color:var(--text);font-family:'DM Mono',monospace;font-size:28px;letter-spacing:.4em;text-align:center;outline:none;transition:.2s;margin-bottom:16px}
+  input[type=password]:focus{border-color:var(--blue);box-shadow:0 0 0 3px rgba(88,166,255,.12)}
+  .btn-blue{width:100%;background:var(--blue);color:#0d1117;border:none;border-radius:8px;padding:13px;font-family:'DM Sans',sans-serif;font-size:14px;font-weight:600;cursor:pointer;transition:.2s;margin-bottom:10px}
+  .btn-blue:hover{background:#79c0ff}
+  .btn-blue:disabled{opacity:.6;cursor:not-allowed}
+  .btn-back{display:block;width:100%;text-align:center;background:var(--surface2);border:1px solid var(--border);color:var(--text);border-radius:8px;padding:11px;font-family:'DM Sans',sans-serif;font-size:13px;text-decoration:none;transition:.2s}
+  .btn-back:hover{background:var(--border)}
+
+  /* SCANNER SCREEN */
+  #scanner-screen{display:none;width:100%;max-width:400px;position:relative;z-index:1}
+  .scan-header{text-align:center;margin-bottom:20px}
+  .scan-header h2{font-family:'DM Serif Display',serif;font-size:26px;margin-bottom:4px}
+  .scan-header p{color:var(--muted);font-size:13px}
+  .camera-box{background:var(--surface);border:1px solid var(--border);border-radius:16px;overflow:hidden;margin-bottom:16px;position:relative}
+  .result-box{background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:14px 16px;display:flex;align-items:center;gap:12px;margin-bottom:14px;min-height:68px;transition:.3s}
+  .result-box.success{border-color:rgba(63,185,80,.5);background:rgba(63,185,80,.06)}
+  .result-box.error{border-color:rgba(247,129,102,.5);background:rgba(247,129,102,.06)}
+  .result-box.duplicate{border-color:rgba(210,153,34,.5);background:rgba(210,153,34,.06)}
+  .result-icon{width:38px;height:38px;border-radius:10px;background:var(--surface2);display:flex;align-items:center;justify-content:center;font-size:20px;flex-shrink:0}
+  .result-name{font-size:14px;font-weight:600;color:var(--text)}
+  .result-detail{font-size:11px;color:var(--muted);font-family:'DM Mono',monospace;margin-top:2px}
+
+  /* html5-qrcode overrides */
+  #reader{border:none!important;width:100%!important}
+  #reader video{border-radius:0!important}
+  #reader__scan_region{background:transparent!important}
+  #reader__dashboard{padding:12px!important;background:var(--surface)!important}
+  #reader__dashboard_section_csr button{background:var(--blue)!important;color:#0d1117!important;border:none!important;border-radius:8px!important;padding:9px 18px!important;font-weight:600!important;cursor:pointer!important;font-family:'DM Sans',sans-serif!important;font-size:13px!important}
+  #reader__camera_selection{background:var(--surface2)!important;border:1px solid var(--border)!important;color:var(--text)!important;border-radius:6px!important;padding:6px 10px!important;font-size:12px!important;width:100%!important}
+  #reader__status_span{color:var(--muted)!important;font-size:12px!important;font-family:'DM Mono',monospace!important}
+</style>
+</head>
+<body>
+
+<!-- PIN -->
+<div id="pin-screen">
+  <div class="card">
+    <div class="logo">
+      <div class="logo-icon">📷</div>
+      <div><h1>Escáner QR</h1><span>Acceso protegido</span></div>
+    </div>
+    <h2>PIN de sesión</h2>
+    <p class="sub">Ingresa el PIN de 4 dígitos para activar el escáner</p>
+    <div class="error-box" id="pin-error">⚠ PIN incorrecto.</div>
+    <label>PIN de 4 dígitos</label>
+    <input type="password" id="pin-input" maxlength="4" placeholder="••••" autofocus>
+    <button class="btn-blue" id="pin-btn" onclick="verifyPin()">📷 Abrir escáner</button>
+    <a href="/index.html" class="btn-back">← Volver al inicio</a>
+    <p style="text-align:center;margin-top:16px;font-size:11px;color:var(--muted)">El PIN lo configura el administrador en las variables de entorno de Vercel</p>
+  </div>
+</div>
+
+<!-- SCANNER -->
+<div id="scanner-screen">
+  <div class="scan-header">
+    <h2>📷 Escáner QR</h2>
+    <p id="session-status">Verificando sesión…</p>
+  </div>
+
+  <div class="camera-box">
+    <div id="reader"></div>
+  </div>
+
+  <div class="result-box" id="result-box">
+    <div class="result-icon" id="result-icon">⏳</div>
+    <div>
+      <div class="result-name" id="result-name">Esperando escaneo…</div>
+      <div class="result-detail" id="result-detail">Apunta la cámara al QR del estudiante</div>
+    </div>
+  </div>
+
+  <button class="btn-back" onclick="closeScanner()">← Volver</button>
+</div>
+
+<script>
+  let pin        = '';
+  let scanner    = null;
+  let locked     = false;
+
+  // Check URL params (QR puede traer ?id=...)
+  const urlParams = new URLSearchParams(window.location.search);
+  const directId  = urlParams.get('id');
+
+  document.getElementById('pin-input').addEventListener('keydown', e => {
+    if (e.key === 'Enter') verifyPin();
+  });
+
+  async function verifyPin() {
+    const val = document.getElementById('pin-input').value;
+    const btn = document.getElementById('pin-btn');
+    const err = document.getElementById('pin-error');
+    if (val.length < 1) return;
+
+    btn.disabled = true; btn.textContent = 'Verificando…';
+    err.style.display = 'none';
+
+    const res = await fetch('/api/verify-pin', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ pin: val })
+    });
+
+    if (res.ok) {
+      pin = val;
+      sessionStorage.setItem('scanner_pin', val);
+      openScanner();
+    } else {
+      err.style.display = 'block';
+      document.getElementById('pin-input').value = '';
+    }
+    btn.disabled = false; btn.textContent = '📷 Abrir escáner';
+  }
+
+  async function openScanner() {
+    document.getElementById('pin-screen').style.display     = 'none';
+    document.getElementById('scanner-screen').style.display = 'block';
+
+    // Check session
+    const sessionRes = await fetch('/api/sessions/active').then(r=>r.json());
+    const statusEl   = document.getElementById('session-status');
+    if (sessionRes) {
+      statusEl.innerHTML = `<span style="color:#3fb950">🟢 Sesión activa: ${sessionRes.name}</span>`;
+    } else {
+      statusEl.innerHTML = `<span style="color:#f78166">🔴 Sesión cerrada — el profesor debe abrir una sesión</span>`;
+    }
+
+    // If came from QR direct link
+    if (directId) {
+      await registerAttendance(directId);
+      return;
+    }
+
+    // Start camera scanner
+    scanner = new Html5QrcodeScanner('reader', { fps: 10, qrbox: { width: 260, height: 260 }, aspectRatio: 1.0 }, false);
+    scanner.render(async (decoded) => {
+      if (locked) return;
+      locked = true;
+
+      // Puede ser URL completa o solo UUID
+      let studentId = decoded;
+      try {
+        const u = new URL(decoded);
+        studentId = u.searchParams.get('id') || decoded;
+      } catch {}
+
+      await registerAttendance(studentId);
+      setTimeout(() => {
+        locked = false;
+        setResult('idle', '⏳', 'Listo para el siguiente', 'Apunta la cámara al QR');
+      }, 2800);
+    }, () => {});
+  }
+
+  async function registerAttendance(studentId) {
+    setResult('scanning', '🔄', 'Procesando…', 'Registrando asistencia');
+    try {
+      const res  = await fetch('/api/attendance', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ studentId, pin })
+      });
+      const data = await res.json();
+
+      if (res.ok) {
+        setResult('success', '✅', `${data.student.nombres} ${data.student.apellidos}`, `Asistencia registrada · ${data.time}`);
+      } else if (res.status === 409) {
+        setResult('duplicate', '⚠️', 'Ya registrado', data.error);
+      } else if (res.status === 400) {
+        setResult('error', '🔴', 'Sesión cerrada', data.error);
+      } else {
+        setResult('error', '❌', 'Error', data.error);
+      }
+    } catch {
+      setResult('error', '❌', 'Sin conexión', 'Verifica la red e intenta de nuevo');
+    }
+  }
+
+  function setResult(type, icon, name, detail) {
+    const box = document.getElementById('result-box');
+    box.className = 'result-box ' + (type !== 'idle' && type !== 'scanning' ? type : '');
+    document.getElementById('result-icon').textContent   = icon;
+    document.getElementById('result-name').textContent   = name;
+    document.getElementById('result-detail').textContent = detail;
+  }
+
+  function closeScanner() {
+    if (scanner) { scanner.clear().catch(()=>{}); scanner = null; }
+    window.location.href = '/index.html';
+  }
+
+  // Si ya tiene PIN guardado en sesión, saltar directamente
+  const savedPin = sessionStorage.getItem('scanner_pin');
+  if (savedPin) { pin = savedPin; openScanner(); }
+</script>
+</body>
+</html>
