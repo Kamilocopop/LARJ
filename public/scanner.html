@@ -5,8 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>La RJ Radio Juvenil — Escáner QR</title>
 <link href="https://fonts.googleapis.com/css2?family=DM+Serif+Display&family=DM+Mono:wght@400;500&family=DM+Sans:wght@300;400;500;600&display=swap" rel="stylesheet">
-<!-- ZXing: librería QR más confiable en móviles -->
-<script src="https://unpkg.com/@zxing/library@0.19.1/umd/index.min.js"></script>
+<script src="https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js"></script>
 <style>
   *{margin:0;padding:0;box-sizing:border-box}
   :root{--bg:#0d1117;--surface:#161b22;--surface2:#21262d;--border:#30363d;--accent:#3fb950;--blue:#58a6ff;--danger:#f78166;--gold:#d29922;--muted:#8b949e;--text:#e6edf3}
@@ -17,7 +16,7 @@
   #pin-screen{position:relative;z-index:1;width:100%;max-width:420px}
   .card{background:var(--surface);border:1px solid var(--border);border-radius:16px;padding:40px;box-shadow:0 0 60px rgba(88,166,255,.06)}
   .logo{display:flex;align-items:center;gap:12px;margin-bottom:28px}
-  .logo-icon{width:44px;height:44px;border-radius:50%;object-fit:cover}
+  .logo img{width:44px;height:44px;border-radius:50%;object-fit:cover}
   .logo h1{font-family:'DM Serif Display',serif;font-size:20px;line-height:1}
   .logo span{font-size:11px;color:var(--muted);font-family:'DM Mono',monospace;letter-spacing:.08em;text-transform:uppercase}
   h2{font-family:'DM Serif Display',serif;font-size:26px;margin-bottom:5px}
@@ -29,42 +28,40 @@
   .btn-blue{width:100%;background:var(--blue);color:#0d1117;border:none;border-radius:8px;padding:13px;font-family:'DM Sans',sans-serif;font-size:14px;font-weight:600;cursor:pointer;transition:.2s;margin-bottom:10px}
   .btn-blue:hover{background:#79c0ff}
   .btn-blue:disabled{opacity:.6;cursor:not-allowed}
-  .btn-back{display:block;width:100%;text-align:center;background:var(--surface2);border:1px solid var(--border);color:var(--text);border-radius:8px;padding:11px;font-family:'DM Sans',sans-serif;font-size:13px;text-decoration:none;transition:.2s;cursor:pointer;border:1px solid var(--border)}
+  .btn-back{width:100%;background:var(--surface2);border:1px solid var(--border);color:var(--text);border-radius:8px;padding:11px;font-family:'DM Sans',sans-serif;font-size:13px;cursor:pointer;text-align:center;transition:.2s}
   .btn-back:hover{background:var(--border)}
 
   /* SCANNER */
   #scanner-screen{display:none;width:100%;max-width:400px;position:relative;z-index:1}
-  .scan-header{text-align:center;margin-bottom:16px}
-  .scan-header h2{font-family:'DM Serif Display',serif;font-size:24px;margin-bottom:6px}
+  .scan-header{text-align:center;margin-bottom:14px}
+  .scan-header h2{font-family:'DM Serif Display',serif;font-size:22px;margin-bottom:8px}
 
-  /* Status pill */
-  .status-pill{display:inline-flex;align-items:center;gap:8px;padding:8px 16px;border-radius:20px;font-size:13px;font-weight:500;margin-bottom:14px;transition:.3s}
+  .status-pill{display:inline-flex;align-items:center;gap:8px;padding:7px 14px;border-radius:20px;font-size:13px;font-weight:500;transition:.3s}
   .status-pill.on{background:rgba(63,185,80,.12);border:1px solid rgba(63,185,80,.3);color:var(--accent)}
   .status-pill.off{background:rgba(247,129,102,.1);border:1px solid rgba(247,129,102,.3);color:var(--danger)}
   .status-pill.wait{background:rgba(139,148,158,.1);border:1px solid var(--border);color:var(--muted)}
-  .pill-dot{width:8px;height:8px;border-radius:50%}
+  .pill-dot{width:8px;height:8px;border-radius:50%;flex-shrink:0}
   .status-pill.on .pill-dot{background:var(--accent);box-shadow:0 0 6px var(--accent);animation:pulse 1.5s infinite}
   .status-pill.off .pill-dot{background:var(--danger)}
   .status-pill.wait .pill-dot{background:var(--muted)}
-  @keyframes pulse{0%,100%{opacity:1}50%{opacity:.4}}
+  @keyframes pulse{0%,100%{opacity:1}50%{opacity:.3}}
 
-  /* Camera */
-  .camera-wrap{background:var(--surface);border:1px solid var(--border);border-radius:16px;overflow:hidden;margin-bottom:14px;position:relative;min-height:280px;display:flex;align-items:center;justify-content:center}
-  #video{width:100%;display:block;border-radius:16px}
-  .scan-overlay{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;pointer-events:none}
-  .scan-box{width:200px;height:200px;border:2px solid var(--accent);border-radius:12px;box-shadow:0 0 0 9999px rgba(0,0,0,0.35)}
-  .scan-box::before,.scan-box::after{content:'';position:absolute;width:24px;height:24px;border-color:var(--accent);border-style:solid}
-  .scan-box::before{top:-2px;left:-2px;border-width:3px 0 0 3px;border-radius:4px 0 0 0}
-  .scan-box::after{bottom:-2px;right:-2px;border-width:0 3px 3px 0;border-radius:0 0 4px 0}
+  .camera-wrap{background:var(--surface);border:1px solid var(--border);border-radius:16px;overflow:hidden;margin-bottom:12px;position:relative}
+  #qr-reader{width:100%}
+  #qr-reader video{border-radius:0!important}
+  #qr-reader__scan_region{background:transparent!important}
+  #qr-reader__dashboard{padding:10px!important;background:var(--surface)!important}
+  #qr-reader__dashboard_section_csr button{background:var(--blue)!important;color:#0d1117!important;border:none!important;border-radius:8px!important;padding:8px 16px!important;font-weight:600!important;cursor:pointer!important;font-family:'DM Sans',sans-serif!important;font-size:13px!important}
+  #qr-reader__camera_selection{background:var(--surface2)!important;border:1px solid var(--border)!important;color:var(--text)!important;border-radius:6px!important;padding:6px 10px!important;font-size:12px!important;width:100%!important}
+  #qr-reader__status_span{color:var(--muted)!important;font-size:11px!important;font-family:'DM Mono',monospace!important}
 
   /* Blocked overlay */
-  #blocked-overlay{display:none;position:absolute;inset:0;background:rgba(13,17,23,0.85);align-items:center;justify-content:center;flex-direction:column;gap:10px;border-radius:16px;text-align:center;padding:20px}
-  #blocked-overlay .icon{font-size:40px}
-  #blocked-overlay p{color:var(--danger);font-size:14px;font-weight:500}
+  #blocked-overlay{display:none;position:absolute;inset:0;background:rgba(13,17,23,.88);align-items:center;justify-content:center;flex-direction:column;gap:8px;text-align:center;padding:24px;z-index:10}
+  #blocked-overlay .icon{font-size:38px}
+  #blocked-overlay p{color:var(--danger);font-size:14px;font-weight:600}
   #blocked-overlay small{color:var(--muted);font-size:12px}
 
-  /* Result */
-  .result-box{background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:14px 16px;display:flex;align-items:center;gap:12px;margin-bottom:14px;min-height:64px;transition:.3s}
+  .result-box{background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:12px 16px;display:flex;align-items:center;gap:12px;margin-bottom:12px;min-height:60px;transition:.3s}
   .result-box.success{border-color:rgba(63,185,80,.5);background:rgba(63,185,80,.06)}
   .result-box.error{border-color:rgba(247,129,102,.5);background:rgba(247,129,102,.06)}
   .result-box.duplicate{border-color:rgba(210,153,34,.5);background:rgba(210,153,34,.06)}
@@ -74,10 +71,10 @@
 
   /* FOTO OVERLAY */
   #photo-overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,0.93);z-index:300;flex-direction:column;align-items:center;justify-content:center}
-  #photo-overlay img{width:240px;height:240px;border-radius:20px;object-fit:cover;border:4px solid var(--accent);box-shadow:0 0 40px rgba(63,185,80,.4)}
-  #overlay-name{font-family:'DM Serif Display',serif;font-size:24px;color:#fff;margin-top:18px;text-align:center}
+  #overlay-photo{width:230px;height:230px;border-radius:20px;object-fit:cover;border:4px solid var(--accent);box-shadow:0 0 40px rgba(63,185,80,.4)}
+  #overlay-name{font-family:'DM Serif Display',serif;font-size:24px;color:#fff;margin-top:16px;text-align:center}
   #overlay-detail{font-family:'DM Mono',monospace;font-size:12px;color:var(--accent);margin-top:6px}
-  .progress-bar{width:240px;height:4px;background:#21262d;border-radius:2px;margin-top:20px;overflow:hidden}
+  .progress-bar{width:230px;height:4px;background:#21262d;border-radius:2px;margin-top:18px;overflow:hidden}
   .progress-fill{height:100%;background:var(--accent);border-radius:2px;width:100%}
 </style>
 </head>
@@ -87,13 +84,13 @@
 <div id="pin-screen">
   <div class="card">
     <div class="logo">
-      <img src="/logo.jpg" class="logo-icon">
+      <img src="/logo.jpg">
       <div><h1>La RJ Radio Juvenil</h1><span>La RJ · Labor Social</span></div>
     </div>
     <h2>PIN de acceso</h2>
     <p class="sub">Ingresa el PIN para activar el escáner</p>
     <div class="error-box" id="pin-error">⚠ PIN incorrecto.</div>
-    <label>PIN de 4 dígitos</label>
+    <label>PIN</label>
     <input type="password" id="pin-input" maxlength="8" placeholder="••••" autofocus>
     <button class="btn-blue" id="pin-btn" onclick="verifyPin()">📷 Abrir escáner</button>
     <button class="btn-back" onclick="window.location.href='/index.html'">← Volver al inicio</button>
@@ -111,8 +108,7 @@
   </div>
 
   <div class="camera-wrap">
-    <video id="video" autoplay muted playsinline></video>
-    <div class="scan-overlay"><div class="scan-box"></div></div>
+    <div id="qr-reader"></div>
     <div id="blocked-overlay">
       <div class="icon">🔴</div>
       <p>Escaneo desactivado</p>
@@ -140,192 +136,177 @@
 </div>
 
 <script>
-let pin         = '';
-let codeReader  = null;
-let locked      = false;
-let sessionActive = false;
-let pollInterval  = null;
+  let pin          = '';
+  let html5QrCode  = null;
+  let locked       = false;
+  let sessionActive = false;
+  let pollInterval  = null;
 
-const urlParams = new URLSearchParams(window.location.search);
-const directId  = urlParams.get('id');
-
-document.getElementById('pin-input').addEventListener('keydown', e => {
-  if (e.key === 'Enter') verifyPin();
-});
-
-// ── PIN ────────────────────────────────────────────
-async function verifyPin() {
-  const val = document.getElementById('pin-input').value;
-  const btn = document.getElementById('pin-btn');
-  const err = document.getElementById('pin-error');
-  if (!val.length) return;
-  btn.disabled = true; btn.textContent = 'Verificando…';
-  err.style.display = 'none';
-
-  const res = await fetch('/api/verify-pin', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ pin: val })
+  document.getElementById('pin-input').addEventListener('keydown', e => {
+    if (e.key === 'Enter') verifyPin();
   });
 
-  if (res.ok) {
-    pin = val;
-    sessionStorage.setItem('scanner_pin', val);
-    openScanner();
-  } else {
-    err.style.display = 'block';
-    document.getElementById('pin-input').value = '';
-  }
-  btn.disabled = false; btn.textContent = '📷 Abrir escáner';
-}
+  // ── PIN ──────────────────────────────────────────
+  async function verifyPin() {
+    const val = document.getElementById('pin-input').value;
+    const btn = document.getElementById('pin-btn');
+    const err = document.getElementById('pin-error');
+    if (!val.length) return;
+    btn.disabled = true; btn.textContent = 'Verificando…';
+    err.style.display = 'none';
 
-// ── OPEN SCANNER ───────────────────────────────────
-async function openScanner() {
-  document.getElementById('pin-screen').style.display     = 'none';
-  document.getElementById('scanner-screen').style.display = 'block';
-
-  // Iniciar polling de sesión cada 4 segundos
-  await checkSession();
-  pollInterval = setInterval(checkSession, 4000);
-
-  // Si vino con ID directo por URL
-  if (directId) {
-    await registerAttendance(directId);
-    return;
-  }
-
-  startCamera();
-}
-
-// ── POLL SESSION (tiempo real) ─────────────────────
-async function checkSession() {
-  try {
-    const res  = await fetch('/api/sessions/active');
-    const data = await res.json();
-    const wasActive = sessionActive;
-    sessionActive   = !!data;
-
-    const pill = document.getElementById('status-pill');
-    const text = document.getElementById('status-text');
-    const blocked = document.getElementById('blocked-overlay');
-
-    if (sessionActive) {
-      pill.className   = 'status-pill on';
-      text.textContent = '🟢 Escaneo activo';
-      blocked.style.display = 'none';
-    } else {
-      pill.className   = 'status-pill off';
-      text.textContent = '🔴 Escaneo desactivado';
-      blocked.style.display = 'flex';
-    }
-  } catch {}
-}
-
-// ── CAMERA (ZXing) ────────────────────────────────
-async function startCamera() {
-  try {
-    const ZXing   = window.ZXing;
-    const hints   = new Map();
-    const formats = [ZXing.BarcodeFormat.QR_CODE];
-    hints.set(ZXing.DecodeHintType.POSSIBLE_FORMATS, formats);
-    hints.set(ZXing.DecodeHintType.TRY_HARDER, true);
-
-    codeReader = new ZXing.BrowserMultiFormatReader(hints, 500);
-
-    const devices = await ZXing.BrowserCodeReader.listVideoInputDevices();
-    // Preferir cámara trasera
-    let deviceId = devices.length > 0 ? devices[devices.length - 1].deviceId : undefined;
-    const back   = devices.find(d => /back|rear|environment/i.test(d.label));
-    if (back) deviceId = back.deviceId;
-
-    await codeReader.decodeFromVideoDevice(deviceId, 'video', async (result, err) => {
-      if (!result) return;
-      if (locked) return;
-      if (!sessionActive) return;
-
-      locked = true;
-      let studentId = result.getText();
-      try {
-        const u = new URL(studentId);
-        studentId = u.searchParams.get('id') || studentId;
-      } catch {}
-
-      await registerAttendance(studentId);
-      setTimeout(() => {
-        locked = false;
-        setResult('idle', '⏳', 'Listo para el siguiente', 'Apunta la cámara al QR');
-      }, 3200);
-    });
-
-  } catch (err) {
-    setResult('error', '❌', 'Sin acceso a cámara', 'Permite el acceso en el navegador');
-  }
-}
-
-// ── REGISTER ──────────────────────────────────────
-async function registerAttendance(studentId) {
-  setResult('scanning', '🔄', 'Procesando…', 'Registrando asistencia');
-  try {
-    const res  = await fetch('/api/attendance', {
+    const res = await fetch('/api/verify-pin', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ studentId, pin })
+      body: JSON.stringify({ pin: val })
     });
-    const data = await res.json();
 
     if (res.ok) {
-      setResult('success', '✅', `${data.student.nombres} ${data.student.apellidos}`, `Registrado · ${data.time}`);
-      if (data.student.photo_url) showPhotoOverlay(data.student, '✅ Asistencia registrada · ' + data.time);
-    } else if (res.status === 409) {
-      setResult('duplicate', '⚠️', 'Ya registrado hoy', data.error);
-      if (data.student?.photo_url) showPhotoOverlay(data.student, '⚠ Ya registró asistencia hoy');
-    } else if (res.status === 400) {
-      setResult('error', '🔴', 'Escaneo apagado', data.error);
+      pin = val;
+      sessionStorage.setItem('scanner_pin', val);
+      openScanner();
     } else {
-      setResult('error', '❌', 'Error', data.error);
+      err.style.display = 'block';
+      document.getElementById('pin-input').value = '';
     }
-  } catch {
-    setResult('error', '❌', 'Sin conexión', 'Verifica la red');
+    btn.disabled = false; btn.textContent = '📷 Abrir escáner';
   }
-}
 
-// ── RESULT BOX ────────────────────────────────────
-function setResult(type, icon, name, detail) {
-  const box = document.getElementById('result-box');
-  box.className = 'result-box ' + (['success','error','duplicate'].includes(type) ? type : '');
-  document.getElementById('result-icon').textContent   = icon;
-  document.getElementById('result-name').textContent   = name;
-  document.getElementById('result-detail').textContent = detail;
-}
+  // ── OPEN SCANNER ─────────────────────────────────
+  function openScanner() {
+    document.getElementById('pin-screen').style.display     = 'none';
+    document.getElementById('scanner-screen').style.display = 'block';
 
-// ── FOTO OVERLAY ──────────────────────────────────
-function showPhotoOverlay(student, detail) {
-  document.getElementById('overlay-photo').src         = student.photo_url;
-  document.getElementById('overlay-name').textContent  = student.nombres + ' ' + student.apellidos;
-  document.getElementById('overlay-detail').textContent = detail;
+    // Iniciar cámara
+    html5QrCode = new Html5Qrcode('qr-reader');
+    html5QrCode.start(
+      { facingMode: 'environment' },
+      { fps: 10, qrbox: { width: 250, height: 250 }, aspectRatio: 1.0 },
+      onScanSuccess,
+      onScanError
+    ).then(() => {
+      setResult('idle', '⏳', 'Esperando escaneo…', 'Apunta la cámara al QR del estudiante');
+    }).catch(err => {
+      setResult('error', '❌', 'Sin acceso a cámara', 'Permite el acceso en tu navegador y recarga');
+      console.error(err);
+    });
 
-  const fill = document.getElementById('progress-fill');
-  fill.style.transition = 'none';
-  fill.style.width      = '100%';
-  setTimeout(() => {
-    fill.style.transition = 'width 3s linear';
-    fill.style.width      = '0%';
-  }, 50);
+    // Polling sesión cada 4 segundos
+    checkSession();
+    pollInterval = setInterval(checkSession, 4000);
+  }
 
-  document.getElementById('photo-overlay').style.display = 'flex';
-  setTimeout(() => { document.getElementById('photo-overlay').style.display = 'none'; }, 3000);
-}
+  // ── SCAN CALLBACKS ───────────────────────────────
+  async function onScanSuccess(decodedText) {
+    if (locked) return;
+    if (!sessionActive) {
+      setResult('error', '🔴', 'Escaneo apagado', 'El profesor debe activar el escaneo');
+      return;
+    }
+    locked = true;
 
-// ── CLOSE ─────────────────────────────────────────
-function closeScanner() {
-  if (pollInterval) clearInterval(pollInterval);
-  if (codeReader) { codeReader.reset(); codeReader = null; }
-  window.location.href = '/index.html';
-}
+    let studentId = decodedText;
+    try {
+      const u = new URL(decodedText);
+      studentId = u.searchParams.get('id') || decodedText;
+    } catch {}
 
-// Auto-login si hay PIN guardado
-const savedPin = sessionStorage.getItem('scanner_pin');
-if (savedPin) { pin = savedPin; openScanner(); }
+    await registerAttendance(studentId);
+
+    setTimeout(() => {
+      locked = false;
+      setResult('idle', '⏳', 'Listo para el siguiente', 'Apunta la cámara al QR');
+    }, 3200);
+  }
+
+  function onScanError() {
+    // ignorar errores normales de frame
+  }
+
+  // ── POLL SESSION ─────────────────────────────────
+  async function checkSession() {
+    try {
+      const res  = await fetch('/api/sessions/active');
+      const data = await res.json();
+      sessionActive = !!data;
+
+      const pill    = document.getElementById('status-pill');
+      const text    = document.getElementById('status-text');
+      const blocked = document.getElementById('blocked-overlay');
+
+      if (sessionActive) {
+        pill.className        = 'status-pill on';
+        text.textContent      = '🟢 Escaneo activo';
+        blocked.style.display = 'none';
+      } else {
+        pill.className        = 'status-pill off';
+        text.textContent      = '🔴 Escaneo desactivado';
+        blocked.style.display = 'flex';
+      }
+    } catch {}
+  }
+
+  // ── REGISTER ─────────────────────────────────────
+  async function registerAttendance(studentId) {
+    setResult('scanning', '🔄', 'Procesando…', 'Registrando asistencia');
+    try {
+      const res  = await fetch('/api/attendance', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ studentId, pin })
+      });
+      const data = await res.json();
+
+      if (res.ok) {
+        setResult('success', '✅', `${data.student.nombres} ${data.student.apellidos}`, `Registrado · ${data.time}`);
+        if (data.student.photo_url) showPhotoOverlay(data.student, '✅ Asistencia registrada · ' + data.time);
+      } else if (res.status === 409) {
+        setResult('duplicate', '⚠️', 'Ya registrado hoy', data.error);
+        if (data.student?.photo_url) showPhotoOverlay(data.student, '⚠ Ya registró asistencia hoy');
+      } else if (res.status === 400) {
+        setResult('error', '🔴', 'Escaneo apagado', data.error);
+      } else {
+        setResult('error', '❌', 'Error', data.error || 'Intenta de nuevo');
+      }
+    } catch {
+      setResult('error', '❌', 'Sin conexión', 'Verifica la red');
+    }
+  }
+
+  // ── RESULT BOX ───────────────────────────────────
+  function setResult(type, icon, name, detail) {
+    const box = document.getElementById('result-box');
+    box.className = 'result-box ' + (['success','error','duplicate'].includes(type) ? type : '');
+    document.getElementById('result-icon').textContent   = icon;
+    document.getElementById('result-name').textContent   = name;
+    document.getElementById('result-detail').textContent = detail;
+  }
+
+  // ── FOTO OVERLAY ─────────────────────────────────
+  function showPhotoOverlay(student, detail) {
+    document.getElementById('overlay-photo').src          = student.photo_url;
+    document.getElementById('overlay-name').textContent   = student.nombres + ' ' + student.apellidos;
+    document.getElementById('overlay-detail').textContent = detail;
+    const fill = document.getElementById('progress-fill');
+    fill.style.transition = 'none';
+    fill.style.width      = '100%';
+    setTimeout(() => { fill.style.transition = 'width 3s linear'; fill.style.width = '0%'; }, 50);
+    document.getElementById('photo-overlay').style.display = 'flex';
+    setTimeout(() => { document.getElementById('photo-overlay').style.display = 'none'; }, 3000);
+  }
+
+  // ── CLOSE ────────────────────────────────────────
+  function closeScanner() {
+    if (pollInterval) clearInterval(pollInterval);
+    if (html5QrCode && html5QrCode.isScanning) {
+      html5QrCode.stop().catch(() => {});
+    }
+    window.location.href = '/index.html';
+  }
+
+  // Auto-login si hay PIN guardado
+  const savedPin = sessionStorage.getItem('scanner_pin');
+  if (savedPin) { pin = savedPin; openScanner(); }
 </script>
 </body>
 </html>
