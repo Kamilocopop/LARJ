@@ -52,3 +52,18 @@ insert into public.students (nombres, apellidos, codigo, grupo) values
   ('Diana',   'López Vargas',     '2021-1003', 'Grupo B'),
   ('Miguel',  'González Mora',    '2021-1004', 'Grupo B'),
   ('Sofía',   'Hernández Cruz',   '2021-1005', 'Grupo A');
+
+-- TABLA: configuración (claves de acceso)
+create table public.config (
+  id           int primary key default 1,
+  admin_token  text not null default 'admin123',
+  scanner_pin  text not null default '1234',
+  updated_at   timestamptz default now()
+);
+
+-- Solo puede haber una fila
+alter table public.config enable row level security;
+
+-- Insertar fila inicial (ajusta los valores que quieras)
+insert into public.config (id, admin_token, scanner_pin) values (1, 'admin123', '1234')
+on conflict (id) do nothing;

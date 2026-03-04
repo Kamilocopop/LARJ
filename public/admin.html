@@ -124,6 +124,7 @@
       <button class="nav-btn" onclick="switchTab('students',this)">👥 Estudiantes</button>
       <button class="nav-btn" onclick="switchTab('attendance',this)">🕐 Asistencia</button>
       <button class="nav-btn" onclick="switchTab('reports',this)">📈 Reportes</button>
+      <button class="nav-btn" onclick="switchTab('config',this);loadConfig()">⚙ Configuración</button>
     </nav>
   </div>
   <div class="topbar-right">
@@ -231,6 +232,39 @@
       </table>
     </div>
   </div>
+
+  <!-- CONFIG -->
+  <div id="tab-config" class="tab">
+    <div class="page-header"><h2>Configuración</h2><p>Cambia las claves de acceso del sistema</p></div>
+    <div class="form-card" style="max-width:480px">
+      <div class="section-title" style="font-size:16px;margin-bottom:6px">🔐 Contraseña de administrador</div>
+      <p style="color:var(--muted);font-size:12px;margin-bottom:16px">La usas tú para entrar al panel admin</p>
+      <div class="field" style="margin-bottom:14px">
+        <label>Nueva contraseña (mín. 4 caracteres)</label>
+        <input type="password" id="new-admin-token" placeholder="••••••••">
+      </div>
+      <div class="field" style="margin-bottom:20px">
+        <label>Confirmar contraseña</label>
+        <input type="password" id="confirm-admin-token" placeholder="••••••••">
+      </div>
+      <button class="btn-primary" onclick="saveConfig('admin')">Guardar contraseña admin</button>
+    </div>
+
+    <div class="form-card" style="max-width:480px;margin-top:16px">
+      <div class="section-title" style="font-size:16px;margin-bottom:6px">📷 PIN del escáner</div>
+      <p style="color:var(--muted);font-size:12px;margin-bottom:16px">El estudiante encargado lo usa para activar el escáner</p>
+      <div class="field" style="margin-bottom:20px">
+        <label>Nuevo PIN (mín. 4 caracteres)</label>
+        <input type="text" id="new-scanner-pin" placeholder="ej: 5678" maxlength="8">
+      </div>
+      <button class="btn-primary" onclick="saveConfig('pin')">Guardar PIN escáner</button>
+    </div>
+
+    <div class="form-card" style="max-width:480px;margin-top:16px;background:rgba(247,129,102,0.05);border-color:rgba(247,129,102,0.2)">
+      <p style="font-size:12px;color:var(--muted)">⚠ <strong style="color:var(--text)">Importante:</strong> después de cambiar la contraseña admin, tu sesión actual se cerrará y deberás ingresar con la nueva contraseña.</p>
+    </div>
+  </div>
+
 
 </div>
 
@@ -641,6 +675,43 @@ function downloadCSV(rows,filename) {
 function logout() { localStorage.removeItem('admin_token'); window.location.href='/index.html'; }
 
 init();
+
+
+async function loadConfig() {
+  // Solo carga para mostrar que está activo, no mostramos claves actuales por seguridad
+}
+
+async function saveConfig(type) {
+  if (type === 'admin') {
+    const newToken   = document.getElementById('new-admin-token').value.trim();
+    const confirmTok = document.getElementById('confirm-admin-token').value.trim();
+    if (!newToken || newToken.length < 4) { showToast('⚠','Mínimo 4 caracteres','err'); return; }
+    if (newToken !== confirmTok) { showToast('⚠','Las contraseñas no coinciden','err'); return; }
+
+    const res = await POST('/api/config', { admin_token: newToken });
+    if (res.ok) {
+      showToast('✅','Contraseña actualizada. Vuelve a iniciar sesión.','ok');
+      setTimeout(() => { localStorage.removeItem('admin_token'); window.location.href='/index.html'; }, 2000);
+    } else {
+      const d = await res.json();
+      showToast('⚠', d.error || 'Error','err');
+    }
+  }
+
+  if (type === 'pin') {
+    const newPin = document.getElementById('new-scanner-pin').value.trim();
+    if (!newPin || newPin.length < 4) { showToast('⚠','Mínimo 4 caracteres','err'); return; }
+
+    const res = await POST('/api/config', { scanner_pin: newPin });
+    if (res.ok) {
+      showToast('✅','PIN del escáner actualizado','ok');
+      document.getElementById('new-scanner-pin').value = '';
+    } else {
+      const d = await res.json();
+      showToast('⚠', d.error || 'Error','err');
+    }
+  }
+}
 
 async function resetAttendance() {
   const confirmText = prompt('Para confirmar escribe la palabra RESETEAR:');
