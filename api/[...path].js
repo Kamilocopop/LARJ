@@ -70,15 +70,28 @@ async function handleUpload(req, res, sub) {
   const { studentId, imageBase64, mimeType } = req.body || {};
   if (!studentId || !imageBase64) return res.status(400).json({ error: 'studentId e imageBase64 requeridos' });
 
+  // Eliminar foto anterior del storage para evitar archivos huérfanos y caché
+  try {
+    const { data: student } = await db.from('students').select('photo_url').eq('id', studentId).maybeSingle();
+    if (student?.photo_url) {
+      const urlObj = new URL(student.photo_url);
+      const pathParts = urlObj.pathname.split('/student-photos/');
+      if (pathParts[1]) {
+        await db.storage.from('student-photos').remove([decodeURIComponent(pathParts[1])]);
+      }
+    }
+  } catch {}
+
   // Convertir base64 a buffer
   const buffer   = Buffer.from(imageBase64, 'base64');
   const ext      = (mimeType || 'image/jpeg').split('/')[1] || 'jpg';
-  const filename = `${studentId}.${ext}`;
+  // Nombre único con timestamp para evitar caché de CDN de Supabase
+  const filename = `${studentId}_${Date.now()}.${ext}`;
 
-  // Subir a Supabase Storage
+  // Subir a Supabase Storage (sin upsert porque el nombre ya es único)
   const { error: uploadError } = await db.storage
     .from('student-photos')
-    .upload(filename, buffer, { contentType: mimeType || 'image/jpeg', upsert: true });
+    .upload(filename, buffer, { contentType: mimeType || 'image/jpeg', upsert: false });
 
   if (uploadError) return res.status(500).json({ error: uploadError.message });
 
