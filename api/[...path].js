@@ -12,6 +12,20 @@ function getSupabase() {
   return supabase;
 }
 
+// ── HORA COLOMBIA (UTC-5) ─────────────────────────────
+function getNowColombia() {
+  const now = new Date();
+  const date = new Intl.DateTimeFormat('en-CA', {
+    timeZone: 'America/Bogota',
+    year: 'numeric', month: '2-digit', day: '2-digit',
+  }).format(now); // → "YYYY-MM-DD"
+  const time = new Intl.DateTimeFormat('es-CO', {
+    timeZone: 'America/Bogota',
+    hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false,
+  }).format(now); // → "HH:mm:ss"
+  return { now, date, time };
+}
+
 async function getConfig() {
   try {
     const db = getSupabase();
@@ -224,7 +238,7 @@ async function handleAttendance(req, res, sub) {
   }
 
   if (req.method === 'GET' && sub === 'today') {
-    const today = new Date().toISOString().split('T')[0];
+    const { date: today } = getNowColombia();
     const { data, error } = await db.from('attendance').select('student_id').eq('date', today);
     if (error) return res.status(500).json({ error: error.message });
     return res.status(200).json((data || []).map(r => r.student_id));
@@ -247,9 +261,7 @@ async function handleAttendance(req, res, sub) {
     if (!session) return res.status(400).json({ error: 'Escaneo apagado. El profesor debe activarlo.' });
     const { data: student } = await db.from('students').select('id, nombres, apellidos, codigo, photo_url').eq('id', studentId).maybeSingle();
     if (!student) return res.status(404).json({ error: 'Estudiante no encontrado' });
-    const now  = new Date();
-    const date = now.toISOString().split('T')[0];
-    const time = now.toTimeString().split(' ')[0];
+    const { date, time } = getNowColombia();
     const { data, error } = await db
       .from('attendance')
       .insert({ student_id: studentId, session_id: session.id, date, time, method: 'qr' })
@@ -268,7 +280,7 @@ async function handleAttendance(req, res, sub) {
 async function handleStats(req, res) {
   if (!await checkAdmin(req)) return res.status(401).json({ error: 'No autorizado' });
   const db    = getSupabase();
-  const today = new Date().toISOString().split('T')[0];
+  const { date: today } = getNowColombia();
   const [studentsRes, presentRes, attendanceRes, sessionsRes] = await Promise.all([
     db.from('students').select('*', { count: 'exact', head: true }),
     db.from('attendance').select('student_id').eq('date', today),
