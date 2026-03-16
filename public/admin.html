@@ -532,26 +532,7 @@ function printQR() {
     h2{margin:0 0 4px;font-size:18px}p{color:#666;font-size:13px;margin:0 0 16px}</style></head>
     <body><h2>${currentQR.name}</h2><p>${currentQR.codigo||''}</p><img src="${img}"/>
     <p style="margin-top:10px;font-size:10px;color:#999">${currentQR.id}</p>
-    <script>window.onload=()=>window.print()<\/script>
-<script>
-// ── RELOJ COLOMBIA ────────────────────────────────────
-function updateClock() {
-  const now = new Date();
-  const hora = new Intl.DateTimeFormat('es-CO', {
-    timeZone: 'America/Bogota',
-    hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: true,
-  }).format(now);
-  const fecha = new Intl.DateTimeFormat('es-CO', {
-    timeZone: 'America/Bogota',
-    weekday: 'short', day: '2-digit', month: 'short',
-  }).format(now);
-  document.getElementById('clock-time').textContent = hora;
-  document.getElementById('clock-date').textContent = fecha;
-}
-updateClock();
-setInterval(updateClock, 1000);
-</script>
-</body></html>`);
+    <script>window.onload=()=>window.print()<\/script></body></html>`);
   win.document.close();
 }
 
@@ -793,6 +774,29 @@ async function resetAttendance() {
     showToast('⚠', data.error || 'Error al resetear','err');
   }
 }
+</script>
+
+<script>
+// ── RELOJ COLOMBIA ────────────────────────────────────
+(function() {
+  function updateClock() {
+    var now = new Date();
+    var hora = new Intl.DateTimeFormat('es-CO', {
+      timeZone: 'America/Bogota',
+      hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: true,
+    }).format(now);
+    var fecha = new Intl.DateTimeFormat('es-CO', {
+      timeZone: 'America/Bogota',
+      weekday: 'short', day: '2-digit', month: 'short',
+    }).format(now);
+    var t = document.getElementById('clock-time');
+    var d = document.getElementById('clock-date');
+    if (t) t.textContent = hora;
+    if (d) d.textContent = fecha;
+  }
+  updateClock();
+  setInterval(updateClock, 1000);
+})();
 </script>
 </body>
 </html>
