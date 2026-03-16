@@ -1,5 +1,5 @@
 'use client'
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { usePathname, useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase'
 import { Session } from '@/lib/types'
@@ -10,6 +10,44 @@ const NAV = [
   { href: '/admin/asistencia', label: 'Asistencia',   icon: '🕐' },
   { href: '/admin/reportes',   label: 'Reportes',     icon: '📈' },
 ]
+
+function ColombiaClockWidget() {
+  const [now, setNow] = useState<Date | null>(null)
+
+  useEffect(() => {
+    setNow(new Date())
+    const id = setInterval(() => setNow(new Date()), 1000)
+    return () => clearInterval(id)
+  }, [])
+
+  if (!now) return null
+
+  const fecha = new Intl.DateTimeFormat('es-CO', {
+    timeZone: 'America/Bogota',
+    weekday: 'short',
+    day: '2-digit',
+    month: 'short',
+    year: 'numeric',
+  }).format(now)
+
+  const hora = new Intl.DateTimeFormat('es-CO', {
+    timeZone: 'America/Bogota',
+    hour: '2-digit',
+    minute: '2-digit',
+    second: '2-digit',
+    hour12: true,
+  }).format(now)
+
+  return (
+    <div className="flex items-center gap-2 px-3 py-1.5 bg-surface2 border border-border rounded-lg text-sm">
+      <span className="text-accent">🕐</span>
+      <div className="flex flex-col leading-tight">
+        <span className="text-white font-mono text-xs font-semibold">{hora}</span>
+        <span className="text-muted font-mono text-[10px] capitalize">{fecha}</span>
+      </div>
+    </div>
+  )
+}
 
 export default function AdminShell({
   children,
@@ -86,6 +124,10 @@ export default function AdminShell({
 
           {/* Right */}
           <div className="flex items-center gap-3 flex-wrap">
+
+            {/* Reloj Colombia */}
+            <ColombiaClockWidget />
+
             {/* Session toggle */}
             <button
               onClick={toggleSession}

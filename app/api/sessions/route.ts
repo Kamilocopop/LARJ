@@ -7,9 +7,11 @@ export async function POST(req: NextRequest) {
   const { name } = await req.json()
 
   // Cerrar cualquier sesión activa primero
+  const nowBogota = new Date(new Date().toLocaleString('en-US', { timeZone: 'America/Bogota' }))
+
   await supabase
     .from('sessions')
-    .update({ active: false, closed_at: new Date().toISOString() })
+    .update({ active: false, closed_at: nowBogota.toISOString() })
     .eq('active', true)
 
   const { data, error } = await supabase
@@ -25,9 +27,10 @@ export async function POST(req: NextRequest) {
 // Cerrar sesión activa
 export async function DELETE() {
   const supabase = createServerSupabase()
+  const nowBogota = new Date(new Date().toLocaleString('en-US', { timeZone: 'America/Bogota' }))
   const { error } = await supabase
     .from('sessions')
-    .update({ active: false, closed_at: new Date().toISOString() })
+    .update({ active: false, closed_at: nowBogota.toISOString() })
     .eq('active', true)
   if (error) return NextResponse.json({ error }, { status: 500 })
   return NextResponse.json({ success: true })

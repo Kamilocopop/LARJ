@@ -2,12 +2,20 @@ import { createServerClient } from '@supabase/ssr'
 import { NextResponse, type NextRequest } from 'next/server'
 
 export async function middleware(request: NextRequest) {
+  const { pathname } = request.nextUrl
+
+  // Si no hay variables de Supabase configuradas, dejar pasar
+  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
+  const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
+
+  if (!supabaseUrl || !supabaseKey) {
+    return NextResponse.next()
+  }
+
   let supabaseResponse = NextResponse.next({ request })
 
-  const supabase = createServerClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
-    {
+  try {
+    const supabase = createServerClient(supabaseUrl, supabaseKey, {
       cookies: {
         getAll() {
           return request.cookies.getAll()
@@ -20,19 +28,22 @@ export async function middleware(request: NextRequest) {
           )
         },
       },
+    })
+
+    const { data: { user } } = await supabase.auth.getUser()
+
+    if (pathname.startsWith('/admin') && !user) {
+      return NextResponse.redirect(new URL('/', request.url))
     }
-  )
 
-  const { data: { user } } = await supabase.auth.getUser()
-
-  // Proteger todas las rutas /admin
-  if (request.nextUrl.pathname.startsWith('/admin') && !user) {
-    return NextResponse.redirect(new URL('/', request.url))
-  }
-
-  // Si ya está autenticado y va al login, redirigir al dashboard
-  if (request.nextUrl.pathname === '/' && user) {
-    return NextResponse.redirect(new URL('/admin', request.url))
+    if (pathname === '/' && user) {
+      return NextResponse.redirect(new URL('/admin', request.url))
+    }
+  } catch {
+    // Si Supabase falla, no bloquear la app
+    if (pathname.startsWith('/admin')) {
+      return NextResponse.redirect(new URL('/', request.url))
+    }
   }
 
   return supabaseResponse
