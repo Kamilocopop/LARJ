@@ -372,11 +372,11 @@ function updateSessionBtn() {
   const banner = document.getElementById('no-session-banner');
   if (activeSession) {
     btn.classList.add('on');
-    lbl.textContent = '🟢 Escaneo activo';
+    lbl.textContent = 'Escaneo activo';
     banner.style.display = 'none';
   } else {
     btn.classList.remove('on');
-    lbl.textContent = '⚫ Escaneo apagado';
+    lbl.textContent = 'Sesión cerrada';
     banner.style.display = 'flex';
   }
 }
