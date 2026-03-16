@@ -4,26 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>La RJ Radio Juvenil — Panel Admin</title>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js">
-// ── RELOJ COLOMBIA ────────────────────────────────────
-function updateClock() {
-  const now = new Date();
-  const hora = new Intl.DateTimeFormat('es-CO', {
-    timeZone: 'America/Bogota',
-    hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: true,
-  }).format(now);
-  const fecha = new Intl.DateTimeFormat('es-CO', {
-    timeZone: 'America/Bogota',
-    weekday: 'short', day: '2-digit', month: 'short',
-  }).format(now);
-  const timeEl = document.getElementById('clock-time');
-  const dateEl = document.getElementById('clock-date');
-  if (timeEl) timeEl.textContent = hora;
-  if (dateEl) dateEl.textContent = fecha;
-}
-updateClock();
-setInterval(updateClock, 1000);
-</script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
 <link href="https://fonts.googleapis.com/css2?family=DM+Serif+Display&family=DM+Mono:wght@400;500&family=DM+Sans:wght@300;400;500;600&display=swap" rel="stylesheet">
 <style>
   *{margin:0;padding:0;box-sizing:border-box}
@@ -39,9 +20,6 @@ setInterval(updateClock, 1000);
   .nav-btn:hover{color:var(--text);background:var(--surface2)}
   .nav-btn.active{color:var(--accent);background:rgba(63,185,80,.1)}
   .topbar-right{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
-  .clock-widget{display:flex;align-items:center;gap:8px;padding:5px 12px;background:var(--surface2);border:1px solid var(--border);border-radius:8px;font-family:'DM Mono',monospace}
-  .clock-widget .clock-time{font-size:13px;font-weight:600;color:var(--text);line-height:1}
-  .clock-widget .clock-date{font-size:10px;color:var(--muted);line-height:1;text-transform:capitalize}
   .session-btn{display:flex;align-items:center;gap:8px;padding:7px 14px;border-radius:8px;border:1px solid var(--border);background:var(--surface2);cursor:pointer;font-family:'DM Sans',sans-serif;font-size:13px;font-weight:500;color:var(--muted);transition:.2s}
   .session-btn:hover{border-color:var(--accent)}
   .session-btn.on{border-color:rgba(63,185,80,.4);color:var(--accent);background:rgba(63,185,80,.08)}
@@ -155,13 +133,6 @@ setInterval(updateClock, 1000);
       <span class="dot"></span>
       <span id="session-label">Sesión cerrada</span>
     </button>
-    <div class="clock-widget">
-      <span style="color:var(--accent)">🕐</span>
-      <div style="display:flex;flex-direction:column">
-        <span class="clock-time" id="clock-time">--:--:--</span>
-        <span class="clock-date" id="clock-date">---</span>
-      </div>
-    </div>
     <a href="/scanner.html" target="_blank" class="btn-sm">📷 Escáner</a>
     <button class="btn-sm btn-danger-sm" onclick="logout()">Salir</button>
   </div>
