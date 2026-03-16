@@ -12,6 +12,20 @@ function getSupabase() {
   return supabase;
 }
 
+// ── HORA COLOMBIA ─────────────────────────────────────
+function getNowColombia() {
+  const now = new Date();
+  const date = new Intl.DateTimeFormat('en-CA', {
+    timeZone: 'America/Bogota',
+    year: 'numeric', month: '2-digit', day: '2-digit',
+  }).format(now); // → "YYYY-MM-DD"
+  const time = new Intl.DateTimeFormat('es-CO', {
+    timeZone: 'America/Bogota',
+    hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false,
+  }).format(now); // → "HH:mm:ss"
+  return { now, date, time };
+}
+
 async function getConfig() {
   try {
     const db = getSupabase();
@@ -70,7 +84,6 @@ async function handleUpload(req, res, sub) {
   const { studentId, imageBase64, mimeType } = req.body || {};
   if (!studentId || !imageBase64) return res.status(400).json({ error: 'studentId e imageBase64 requeridos' });
 
-  // Eliminar foto anterior del storage para evitar archivos huérfanos y caché
   try {
     const { data: student } = await db.from('students').select('photo_url').eq('id', studentId).maybeSingle();
     if (student?.photo_url) {
@@ -82,24 +95,19 @@ async function handleUpload(req, res, sub) {
     }
   } catch {}
 
-  // Convertir base64 a buffer
   const buffer   = Buffer.from(imageBase64, 'base64');
   const ext      = (mimeType || 'image/jpeg').split('/')[1] || 'jpg';
-  // Nombre único con timestamp para evitar caché de CDN de Supabase
   const filename = `${studentId}_${Date.now()}.${ext}`;
 
-  // Subir a Supabase Storage (sin upsert porque el nombre ya es único)
   const { error: uploadError } = await db.storage
     .from('student-photos')
     .upload(filename, buffer, { contentType: mimeType || 'image/jpeg', upsert: false });
 
   if (uploadError) return res.status(500).json({ error: uploadError.message });
 
-  // Obtener URL pública
   const { data: urlData } = db.storage.from('student-photos').getPublicUrl(filename);
   const photoUrl = urlData.publicUrl;
 
-  // Guardar URL en el estudiante
   const { error: updateError } = await db.from('students').update({ photo_url: photoUrl }).eq('id', studentId);
   if (updateError) return res.status(500).json({ error: updateError.message });
 
@@ -169,7 +177,6 @@ async function handleStudents(req, res, sub) {
     if (!await checkAdmin(req)) return res.status(401).json({ error: 'No autorizado' });
     const { id } = req.body || {};
     if (!id) return res.status(400).json({ error: 'ID requerido' });
-    // Eliminar foto del storage también
     try {
       const { data: student } = await db.from('students').select('photo_url').eq('id', id).maybeSingle();
       if (student?.photo_url) {
@@ -197,6 +204,7 @@ async function handleSessions(req, res, sub) {
   }
   if (req.method === 'POST' && !sub) {
     if (!await checkAdmin(req)) return res.status(401).json({ error: 'No autorizado' });
+    const { date } = getNowColombia();
     await db.from('sessions').update({ active: false, closed_at: new Date().toISOString() }).eq('active', true);
     const { data, error } = await db.from('sessions').insert({ name: 'Clase', active: true }).select().single();
     if (error) return res.status(500).json({ error: error.message });
@@ -224,8 +232,8 @@ async function handleAttendance(req, res, sub) {
   }
 
   if (req.method === 'GET' && sub === 'today') {
-    const today = new Date().toISOString().split('T')[0];
-    const { data, error } = await db.from('attendance').select('student_id').eq('date', today);
+    const { date } = getNowColombia(); // ✅ hora Colombia
+    const { data, error } = await db.from('attendance').select('student_id').eq('date', date);
     if (error) return res.status(500).json({ error: error.message });
     return res.status(200).json((data || []).map(r => r.student_id));
   }
@@ -247,9 +255,10 @@ async function handleAttendance(req, res, sub) {
     if (!session) return res.status(400).json({ error: 'Escaneo apagado. El profesor debe activarlo.' });
     const { data: student } = await db.from('students').select('id, nombres, apellidos, codigo, photo_url').eq('id', studentId).maybeSingle();
     if (!student) return res.status(404).json({ error: 'Estudiante no encontrado' });
-    const now  = new Date();
-    const date = now.toISOString().split('T')[0];
-    const time = now.toTimeString().split(' ')[0];
+
+    // ✅ Hora Colombia
+    const { date, time } = getNowColombia();
+
     const { data, error } = await db
       .from('attendance')
       .insert({ student_id: studentId, session_id: session.id, date, time, method: 'qr' })
@@ -267,8 +276,8 @@ async function handleAttendance(req, res, sub) {
 // ── STATS ─────────────────────────────────────────────
 async function handleStats(req, res) {
   if (!await checkAdmin(req)) return res.status(401).json({ error: 'No autorizado' });
-  const db    = getSupabase();
-  const today = new Date().toISOString().split('T')[0];
+  const db = getSupabase();
+  const { date: today } = getNowColombia(); // ✅ hora Colombia
   const [studentsRes, presentRes, attendanceRes, sessionsRes] = await Promise.all([
     db.from('students').select('*', { count: 'exact', head: true }),
     db.from('attendance').select('student_id').eq('date', today),
