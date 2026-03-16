@@ -68,7 +68,7 @@ declare
 begin
   select count(*) into total_students from public.students;
   select count(distinct student_id) into present_today
-    from public.attendance where date = (now() AT TIME ZONE 'America/Bogota')::date;
+    from public.attendance where date = current_date;
   return json_build_object(
     'total',      total_students,
     'present',    present_today,

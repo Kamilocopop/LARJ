@@ -41,11 +41,14 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'Estudiante no registrado en el sistema' }, { status: 404 })
     }
 
-    // Supabase calcula date y time automáticamente en hora Colombia (America/Bogota)
-    // gracias al DEFAULT configurado en la base de datos
+    // Registrar asistencia
+    const now  = new Date()
+    const date = now.toISOString().split('T')[0]
+    const time = now.toTimeString().split(' ')[0]
+
     const { data, error } = await supabase
       .from('attendance')
-      .insert({ student_id: studentId, session_id: session.id, method: 'qr' })
+      .insert({ student_id: studentId, session_id: session.id, date, time, method: 'qr' })
       .select()
       .single()
 
@@ -59,20 +62,11 @@ export async function POST(req: NextRequest) {
       throw error
     }
 
-    // Hora para mostrar en pantalla (Colombia)
-    const displayTime = new Intl.DateTimeFormat('es-CO', {
-      timeZone: 'America/Bogota',
-      hour: '2-digit',
-      minute: '2-digit',
-      second: '2-digit',
-      hour12: false,
-    }).format(new Date())
-
     return NextResponse.json({
       success: true,
       student,
       attendance: data,
-      time: displayTime,
+      time: now.toLocaleTimeString('es-CO', { hour12: false }),
       session: session.name,
     })
   } catch (err) {
