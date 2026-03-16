@@ -5,24 +5,6 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>La RJ Radio Juvenil — Panel Admin</title>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js">
-// ── RELOJ COLOMBIA ────────────────────────────────────
-function updateClock() {
-  const now = new Date();
-  const hora = new Intl.DateTimeFormat('es-CO', {
-    timeZone: 'America/Bogota',
-    hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: true,
-  }).format(now);
-  const fecha = new Intl.DateTimeFormat('es-CO', {
-    timeZone: 'America/Bogota',
-    weekday: 'short', day: '2-digit', month: 'short',
-  }).format(now);
-  const timeEl = document.getElementById('clock-time');
-  const dateEl = document.getElementById('clock-date');
-  if (timeEl) timeEl.textContent = hora;
-  if (dateEl) dateEl.textContent = fecha;
-}
-updateClock();
-setInterval(updateClock, 1000);
 </script>
 <link href="https://fonts.googleapis.com/css2?family=DM+Serif+Display&family=DM+Mono:wght@400;500&family=DM+Sans:wght@300;400;500;600&display=swap" rel="stylesheet">
 <style>
@@ -550,7 +532,26 @@ function printQR() {
     h2{margin:0 0 4px;font-size:18px}p{color:#666;font-size:13px;margin:0 0 16px}</style></head>
     <body><h2>${currentQR.name}</h2><p>${currentQR.codigo||''}</p><img src="${img}"/>
     <p style="margin-top:10px;font-size:10px;color:#999">${currentQR.id}</p>
-    <script>window.onload=()=>window.print()<\/script></body></html>`);
+    <script>window.onload=()=>window.print()<\/script>
+<script>
+// ── RELOJ COLOMBIA ────────────────────────────────────
+function updateClock() {
+  const now = new Date();
+  const hora = new Intl.DateTimeFormat('es-CO', {
+    timeZone: 'America/Bogota',
+    hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: true,
+  }).format(now);
+  const fecha = new Intl.DateTimeFormat('es-CO', {
+    timeZone: 'America/Bogota',
+    weekday: 'short', day: '2-digit', month: 'short',
+  }).format(now);
+  document.getElementById('clock-time').textContent = hora;
+  document.getElementById('clock-date').textContent = fecha;
+}
+updateClock();
+setInterval(updateClock, 1000);
+</script>
+</body></html>`);
   win.document.close();
 }
 
