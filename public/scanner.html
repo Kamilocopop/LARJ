@@ -1,0 +1,319 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>La RJ Radio Juvenil — Escáner QR</title>
+<link href="https://fonts.googleapis.com/css2?family=DM+Serif+Display&family=DM+Mono:wght@400;500&family=DM+Sans:wght@300;400;500;600&display=swap" rel="stylesheet">
+<script src="https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js"></script>
+<style>
+  *{margin:0;padding:0;box-sizing:border-box}
+  :root{--bg:#0d1117;--surface:#161b22;--surface2:#21262d;--border:#30363d;--accent:#3fb950;--blue:#58a6ff;--danger:#f78166;--gold:#d29922;--muted:#8b949e;--text:#e6edf3}
+  body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--text);min-height:100vh;min-height:100dvh;display:flex;align-items:center;justify-content:center;padding:12px}
+  body::before{content:'';position:fixed;inset:0;background-image:linear-gradient(rgba(63,185,80,0.04) 1px,transparent 1px),linear-gradient(90deg,rgba(63,185,80,0.04) 1px,transparent 1px);background-size:40px 40px;pointer-events:none}
+
+  /* PIN */
+  #pin-screen{position:relative;z-index:1;width:100%;max-width:420px}
+  .card{background:var(--surface);border:1px solid var(--border);border-radius:16px;padding:32px 24px;box-shadow:0 0 60px rgba(88,166,255,.06)}
+  .logo{display:flex;align-items:center;gap:12px;margin-bottom:24px}
+  .logo img{width:44px;height:44px;border-radius:50%;object-fit:cover}
+  .logo h1{font-family:'DM Serif Display',serif;font-size:20px;line-height:1}
+  .logo span{font-size:11px;color:var(--muted);font-family:'DM Mono',monospace;letter-spacing:.08em;text-transform:uppercase}
+  h2{font-family:'DM Serif Display',serif;font-size:24px;margin-bottom:5px}
+  .sub{color:var(--muted);font-size:13px;margin-bottom:20px}
+  .error-box{background:rgba(247,129,102,.1);border:1px solid rgba(247,129,102,.3);color:var(--danger);border-radius:8px;padding:10px 14px;font-size:13px;margin-bottom:14px;display:none}
+  label{display:block;font-size:10px;font-family:'DM Mono',monospace;text-transform:uppercase;letter-spacing:.06em;color:var(--muted);margin-bottom:8px}
+  input[type=password]{width:100%;background:var(--bg);border:1px solid var(--border);border-radius:8px;padding:14px;color:var(--text);font-family:'DM Mono',monospace;font-size:28px;letter-spacing:.4em;text-align:center;outline:none;transition:.2s;margin-bottom:16px}
+  input[type=password]:focus{border-color:var(--blue);box-shadow:0 0 0 3px rgba(88,166,255,.12)}
+  .btn-blue{width:100%;background:var(--blue);color:#0d1117;border:none;border-radius:8px;padding:14px;font-family:'DM Sans',sans-serif;font-size:15px;font-weight:600;cursor:pointer;transition:.2s;margin-bottom:10px}
+  .btn-blue:hover{background:#79c0ff}
+  .btn-blue:disabled{opacity:.6;cursor:not-allowed}
+  .btn-back{width:100%;background:var(--surface2);border:1px solid var(--border);color:var(--text);border-radius:8px;padding:12px;font-family:'DM Sans',sans-serif;font-size:14px;cursor:pointer;text-align:center;transition:.2s}
+  .btn-back:hover{background:var(--border)}
+
+  /* SCANNER */
+  #scanner-screen{display:none;width:100%;max-width:440px;position:relative;z-index:1}
+  .scan-header{text-align:center;margin-bottom:12px}
+  .scan-header h2{font-family:'DM Serif Display',serif;font-size:20px;margin-bottom:8px}
+
+  .status-pill{display:inline-flex;align-items:center;gap:8px;padding:7px 14px;border-radius:20px;font-size:13px;font-weight:500;transition:.3s}
+  .status-pill.on{background:rgba(63,185,80,.12);border:1px solid rgba(63,185,80,.3);color:var(--accent)}
+  .status-pill.off{background:rgba(247,129,102,.1);border:1px solid rgba(247,129,102,.3);color:var(--danger)}
+  .status-pill.wait{background:rgba(139,148,158,.1);border:1px solid var(--border);color:var(--muted)}
+  .pill-dot{width:8px;height:8px;border-radius:50%;flex-shrink:0}
+  .status-pill.on .pill-dot{background:var(--accent);box-shadow:0 0 6px var(--accent);animation:pulse 1.5s infinite}
+  .status-pill.off .pill-dot{background:var(--danger)}
+  .status-pill.wait .pill-dot{background:var(--muted)}
+  @keyframes pulse{0%,100%{opacity:1}50%{opacity:.3}}
+
+  .camera-wrap{background:var(--surface);border:1px solid var(--border);border-radius:16px;overflow:hidden;margin-bottom:10px;position:relative}
+  #qr-reader{width:100%}
+  #qr-reader video{border-radius:0!important;width:100%!important;height:auto!important}
+  #qr-reader__scan_region{background:transparent!important}
+  #qr-reader__dashboard{padding:8px!important;background:var(--surface)!important}
+  #qr-reader__dashboard_section_csr button{background:var(--blue)!important;color:#0d1117!important;border:none!important;border-radius:8px!important;padding:8px 16px!important;font-weight:600!important;cursor:pointer!important;font-family:'DM Sans',sans-serif!important;font-size:13px!important}
+  #qr-reader__camera_selection{background:var(--surface2)!important;border:1px solid var(--border)!important;color:var(--text)!important;border-radius:6px!important;padding:6px 10px!important;font-size:12px!important;width:100%!important}
+  #qr-reader__status_span{color:var(--muted)!important;font-size:11px!important;font-family:'DM Mono',monospace!important}
+
+  /* Blocked overlay */
+  #blocked-overlay{display:none;position:absolute;inset:0;background:rgba(13,17,23,.88);align-items:center;justify-content:center;flex-direction:column;gap:8px;text-align:center;padding:24px;z-index:10}
+  #blocked-overlay .icon{font-size:38px}
+  #blocked-overlay p{color:var(--danger);font-size:14px;font-weight:600}
+  #blocked-overlay small{color:var(--muted);font-size:12px}
+
+  .result-box{background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:12px 14px;display:flex;align-items:center;gap:12px;margin-bottom:10px;min-height:56px;transition:.3s}
+  .result-box.success{border-color:rgba(63,185,80,.5);background:rgba(63,185,80,.06)}
+  .result-box.error{border-color:rgba(247,129,102,.5);background:rgba(247,129,102,.06)}
+  .result-box.duplicate{border-color:rgba(210,153,34,.5);background:rgba(210,153,34,.06)}
+  .result-icon{font-size:22px;flex-shrink:0}
+  .result-name{font-size:14px;font-weight:600}
+  .result-detail{font-size:11px;color:var(--muted);font-family:'DM Mono',monospace;margin-top:2px}
+
+  /* FOTO OVERLAY */
+  #photo-overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,0.93);z-index:300;flex-direction:column;align-items:center;justify-content:center;padding:20px}
+  #overlay-photo{width:min(230px,60vw);height:min(230px,60vw);border-radius:20px;object-fit:cover;border:4px solid var(--accent);box-shadow:0 0 40px rgba(63,185,80,.4)}
+  #overlay-name{font-family:'DM Serif Display',serif;font-size:22px;color:#fff;margin-top:14px;text-align:center}
+  #overlay-detail{font-family:'DM Mono',monospace;font-size:12px;color:var(--accent);margin-top:6px;text-align:center}
+  .progress-bar{width:min(230px,60vw);height:4px;background:#21262d;border-radius:2px;margin-top:16px;overflow:hidden}
+  .progress-fill{height:100%;background:var(--accent);border-radius:2px;width:100%}
+
+  @media(max-width:480px){
+    body{padding:8px;align-items:flex-start;padding-top:16px}
+    .card{padding:24px 16px;border-radius:14px}
+    h2{font-size:22px}
+    #scanner-screen{max-width:100%}
+  }
+</style>
+</head>
+<body>
+
+<!-- PIN -->
+<div id="pin-screen">
+  <div class="card">
+    <div class="logo">
+      <img src="/logo.jpg">
+      <div><h1>La RJ Radio Juvenil</h1><span>La RJ · Labor Social</span></div>
+    </div>
+    <h2>PIN de acceso</h2>
+    <p class="sub">Ingresa el PIN para activar el escáner</p>
+    <div class="error-box" id="pin-error">⚠ PIN incorrecto.</div>
+    <label>PIN</label>
+    <input type="password" id="pin-input" maxlength="8" placeholder="••••" autofocus>
+    <button class="btn-blue" id="pin-btn" onclick="verifyPin()">📷 Abrir escáner</button>
+    <button class="btn-back" onclick="window.location.href='/index.html'">← Volver al inicio</button>
+  </div>
+</div>
+
+<!-- SCANNER -->
+<div id="scanner-screen">
+  <div class="scan-header">
+    <h2>📷 La RJ · Asistencia</h2>
+    <div id="status-pill" class="status-pill wait">
+      <span class="pill-dot"></span>
+      <span id="status-text">Verificando…</span>
+    </div>
+  </div>
+
+  <div class="camera-wrap">
+    <div id="qr-reader"></div>
+    <div id="blocked-overlay">
+      <div class="icon">🔴</div>
+      <p>Escaneo desactivado</p>
+      <small>El profesor debe activar el escaneo</small>
+    </div>
+  </div>
+
+  <div class="result-box" id="result-box">
+    <div class="result-icon" id="result-icon">⏳</div>
+    <div>
+      <div class="result-name" id="result-name">Esperando escaneo…</div>
+      <div class="result-detail" id="result-detail">Apunta la cámara al QR del estudiante</div>
+    </div>
+  </div>
+
+  <button class="btn-back" onclick="closeScanner()">← Volver</button>
+</div>
+
+<!-- FOTO OVERLAY -->
+<div id="photo-overlay" onclick="this.style.display='none'">
+  <img id="overlay-photo" src="">
+  <div id="overlay-name"></div>
+  <div id="overlay-detail"></div>
+  <div class="progress-bar"><div class="progress-fill" id="progress-fill"></div></div>
+</div>
+
+<script>
+  let pin          = '';
+  let html5QrCode  = null;
+  let locked       = false;
+  let sessionActive = false;
+  let pollInterval  = null;
+
+  document.getElementById('pin-input').addEventListener('keydown', e => {
+    if (e.key === 'Enter') verifyPin();
+  });
+
+  // ── PIN ──────────────────────────────────────────
+  async function verifyPin() {
+    const val = document.getElementById('pin-input').value;
+    const btn = document.getElementById('pin-btn');
+    const err = document.getElementById('pin-error');
+    if (!val.length) return;
+    btn.disabled = true; btn.textContent = 'Verificando…';
+    err.style.display = 'none';
+
+    const res = await fetch('/api/verify-pin', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ pin: val })
+    });
+
+    if (res.ok) {
+      pin = val;
+      sessionStorage.setItem('scanner_pin', val);
+      openScanner();
+    } else {
+      err.style.display = 'block';
+      document.getElementById('pin-input').value = '';
+    }
+    btn.disabled = false; btn.textContent = '📷 Abrir escáner';
+  }
+
+  // ── OPEN SCANNER ─────────────────────────────────
+  function openScanner() {
+    document.getElementById('pin-screen').style.display     = 'none';
+    document.getElementById('scanner-screen').style.display = 'block';
+
+    // Iniciar cámara
+    html5QrCode = new Html5Qrcode('qr-reader');
+    html5QrCode.start(
+      { facingMode: 'environment' },
+      { fps: 10, qrbox: { width: 250, height: 250 }, aspectRatio: 1.0 },
+      onScanSuccess,
+      onScanError
+    ).then(() => {
+      setResult('idle', '⏳', 'Esperando escaneo…', 'Apunta la cámara al QR del estudiante');
+    }).catch(err => {
+      setResult('error', '❌', 'Sin acceso a cámara', 'Permite el acceso en tu navegador y recarga');
+      console.error(err);
+    });
+
+    // Polling sesión cada 4 segundos
+    checkSession();
+    pollInterval = setInterval(checkSession, 4000);
+  }
+
+  // ── SCAN CALLBACKS ───────────────────────────────
+  async function onScanSuccess(decodedText) {
+    if (locked) return;
+    if (!sessionActive) {
+      setResult('error', '🔴', 'Escaneo apagado', 'El profesor debe activar el escaneo');
+      return;
+    }
+    locked = true;
+
+    let studentId = decodedText;
+    try {
+      const u = new URL(decodedText);
+      studentId = u.searchParams.get('id') || decodedText;
+    } catch {}
+
+    await registerAttendance(studentId);
+
+    setTimeout(() => {
+      locked = false;
+      setResult('idle', '⏳', 'Listo para el siguiente', 'Apunta la cámara al QR');
+    }, 3200);
+  }
+
+  function onScanError() {
+    // ignorar errores normales de frame
+  }
+
+  // ── POLL SESSION ─────────────────────────────────
+  async function checkSession() {
+    try {
+      const res  = await fetch('/api/sessions/active');
+      const data = await res.json();
+      sessionActive = !!data;
+
+      const pill    = document.getElementById('status-pill');
+      const text    = document.getElementById('status-text');
+      const blocked = document.getElementById('blocked-overlay');
+
+      if (sessionActive) {
+        pill.className        = 'status-pill on';
+        text.textContent      = '🟢 Escaneo activo';
+        blocked.style.display = 'none';
+      } else {
+        pill.className        = 'status-pill off';
+        text.textContent      = '🔴 Escaneo desactivado';
+        blocked.style.display = 'flex';
+      }
+    } catch {}
+  }
+
+  // ── REGISTER ─────────────────────────────────────
+  async function registerAttendance(studentId) {
+    setResult('scanning', '🔄', 'Procesando…', 'Registrando asistencia');
+    try {
+      const res  = await fetch('/api/attendance', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ studentId, pin })
+      });
+      const data = await res.json();
+
+      if (res.ok) {
+        setResult('success', '✅', `${data.student.nombres} ${data.student.apellidos}`, `Registrado · ${data.time}`);
+        if (data.student.photo_url) showPhotoOverlay(data.student, '✅ Asistencia registrada · ' + data.time);
+      } else if (res.status === 409) {
+        setResult('duplicate', '⚠️', 'Ya registrado hoy', data.error);
+        if (data.student?.photo_url) showPhotoOverlay(data.student, '⚠ Ya registró asistencia hoy');
+      } else if (res.status === 400) {
+        setResult('error', '🔴', 'Escaneo apagado', data.error);
+      } else {
+        setResult('error', '❌', 'Error', data.error || 'Intenta de nuevo');
+      }
+    } catch {
+      setResult('error', '❌', 'Sin conexión', 'Verifica la red');
+    }
+  }
+
+  // ── RESULT BOX ───────────────────────────────────
+  function setResult(type, icon, name, detail) {
+    const box = document.getElementById('result-box');
+    box.className = 'result-box ' + (['success','error','duplicate'].includes(type) ? type : '');
+    document.getElementById('result-icon').textContent   = icon;
+    document.getElementById('result-name').textContent   = name;
+    document.getElementById('result-detail').textContent = detail;
+  }
+
+  // ── FOTO OVERLAY ─────────────────────────────────
+  function showPhotoOverlay(student, detail) {
+    document.getElementById('overlay-photo').src          = student.photo_url;
+    document.getElementById('overlay-name').textContent   = student.nombres + ' ' + student.apellidos;
+    document.getElementById('overlay-detail').textContent = detail;
+    const fill = document.getElementById('progress-fill');
+    fill.style.transition = 'none';
+    fill.style.width      = '100%';
+    setTimeout(() => { fill.style.transition = 'width 3s linear'; fill.style.width = '0%'; }, 50);
+    document.getElementById('photo-overlay').style.display = 'flex';
+    setTimeout(() => { document.getElementById('photo-overlay').style.display = 'none'; }, 3000);
+  }
+
+  // ── CLOSE ────────────────────────────────────────
+  function closeScanner() {
+    if (pollInterval) clearInterval(pollInterval);
+    if (html5QrCode && html5QrCode.isScanning) {
+      html5QrCode.stop().catch(() => {});
+    }
+    window.location.href = '/index.html';
+  }
+
+  // Auto-login si hay PIN guardado
+  const savedPin = sessionStorage.getItem('scanner_pin');
+  if (savedPin) { pin = savedPin; openScanner(); }
+</script>
+</body>
+</html>
