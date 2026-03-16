@@ -106,6 +106,12 @@
   .filter-row{display:flex;align-items:center;gap:10px;margin-bottom:20px;flex-wrap:wrap}
   input[type=date]{background:var(--surface2);border:1px solid var(--border);border-radius:7px;padding:8px 12px;color:var(--text);font-family:'DM Sans',sans-serif;font-size:13px;outline:none}
   input[type=date]:focus{border-color:var(--accent)}
+
+  /* CLOCK */
+  .clock-widget{display:flex;align-items:center;gap:8px;padding:6px 12px;background:var(--surface2);border:1px solid var(--border);border-radius:8px}
+  .clock-icon{color:var(--accent);font-size:14px}
+  .clock-time{font-family:'DM Mono',monospace;font-size:13px;font-weight:500;color:var(--text);line-height:1.2}
+  .clock-date{font-family:'DM Mono',monospace;font-size:10px;color:var(--muted);line-height:1.2}
   /* SCROLLBAR */
   ::-webkit-scrollbar{width:5px}
   ::-webkit-scrollbar-track{background:var(--bg)}
@@ -129,7 +135,14 @@
     </nav>
   </div>
   <div class="topbar-right">
-    <button class="session-btn" id="session-btn" onclick="toggleSession()">
+    <div class="clock-widget">
+      <span class="clock-icon">🕐</span>
+      <div>
+        <div class="clock-time" id="clock-time">--:--:--</div>
+        <div class="clock-date" id="clock-date">----</div>
+      </div>
+    </div>
+        <button class="session-btn" id="session-btn" onclick="toggleSession()">
       <span class="dot"></span>
       <span id="session-label">Sesión cerrada</span>
     </button>
@@ -289,6 +302,24 @@
 <div class="toast" id="toast"><span id="toast-icon"></span><span id="toast-msg"></span></div>
 
 <script>
+
+// ─── CLOCK ───────────────────────────────────────────
+function updateClock() {
+  const now  = new Date();
+  const hora = new Intl.DateTimeFormat('es-CO', {
+    timeZone: 'America/Bogota',
+    hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: true
+  }).format(now);
+  const fecha = new Intl.DateTimeFormat('es-CO', {
+    timeZone: 'America/Bogota',
+    weekday: 'short', day: '2-digit', month: 'short', year: 'numeric'
+  }).format(now);
+  document.getElementById('clock-time').textContent = hora;
+  document.getElementById('clock-date').textContent = fecha.charAt(0).toUpperCase() + fecha.slice(1);
+}
+updateClock();
+setInterval(updateClock, 1000);
+
 // ─── CONFIG ──────────────────────────────────────────
 const TOKEN = localStorage.getItem('admin_token') || '';
 if (!TOKEN) window.location.href = '/index.html';
