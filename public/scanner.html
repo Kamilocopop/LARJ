@@ -2,14 +2,22 @@
 <html lang="es">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
 <title>La RJ Radio Juvenil — Escáner QR</title>
+<link rel="manifest" href="/manifest.json">
+<meta name="theme-color" content="#0d1117">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="La RJ">
+<link rel="apple-touch-icon" href="/icons/icon-192.png">
+<link rel="icon" type="image/png" sizes="192x192" href="/icons/icon-192.png">
 <link href="https://fonts.googleapis.com/css2?family=DM+Serif+Display&family=DM+Mono:wght@400;500&family=DM+Sans:wght@300;400;500;600&display=swap" rel="stylesheet">
 <script src="https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js"></script>
 <style>
   *{margin:0;padding:0;box-sizing:border-box}
   :root{--bg:#0d1117;--surface:#161b22;--surface2:#21262d;--border:#30363d;--accent:#3fb950;--blue:#58a6ff;--danger:#f78166;--gold:#d29922;--muted:#8b949e;--text:#e6edf3}
-  body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--text);min-height:100vh;min-height:100dvh;display:flex;align-items:center;justify-content:center;padding:12px}
+  body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--text);min-height:100vh;min-height:100dvh;display:flex;align-items:center;justify-content:center;padding:env(safe-area-inset-top,12px) 12px env(safe-area-inset-bottom,12px)}
   body::before{content:'';position:fixed;inset:0;background-image:linear-gradient(rgba(63,185,80,0.04) 1px,transparent 1px),linear-gradient(90deg,rgba(63,185,80,0.04) 1px,transparent 1px);background-size:40px 40px;pointer-events:none}
 
   /* PIN */
@@ -77,11 +85,20 @@
   .progress-bar{width:min(230px,60vw);height:4px;background:#21262d;border-radius:2px;margin-top:16px;overflow:hidden}
   .progress-fill{height:100%;background:var(--accent);border-radius:2px;width:100%}
 
+  *{-webkit-tap-highlight-color:transparent}
   @media(max-width:480px){
-    body{padding:8px;align-items:flex-start;padding-top:16px}
-    .card{padding:24px 16px;border-radius:14px}
-    h2{font-size:22px}
+    body{padding:8px;padding-top:env(safe-area-inset-top,12px);padding-bottom:env(safe-area-inset-bottom,8px);align-items:flex-start}
+    .card{padding:22px 16px;border-radius:14px}
+    h2{font-size:20px}
     #scanner-screen{max-width:100%}
+    .btn-blue,.btn-back{padding:16px;font-size:15px}
+    input[type=password]{font-size:24px;padding:12px}
+    .result-box{padding:10px 12px}
+    .result-name{font-size:13px}
+  }
+  @media(max-width:360px){
+    h2{font-size:18px}
+    .logo h1{font-size:17px}
   }
 </style>
 </head>
@@ -314,6 +331,11 @@
   // Auto-login si hay PIN guardado
   const savedPin = sessionStorage.getItem('scanner_pin');
   if (savedPin) { pin = savedPin; openScanner(); }
+
+  // Registrar Service Worker
+  if ('serviceWorker' in navigator) {
+    navigator.serviceWorker.register('/sw.js').catch(() => {});
+  }
 </script>
 </body>
 </html>

@@ -59,6 +59,7 @@ export default async function handler(req, res) {
   try {
     switch (endpoint) {
       case 'health':     return res.status(200).json({ ok: true });
+      case 'ping':       return await handlePing(req, res);
       case 'verify-pin': return await verifyPin(req, res);
       case 'attendance': return await handleAttendance(req, res, sub);
       case 'students':   return await handleStudents(req, res, sub);
@@ -71,6 +72,21 @@ export default async function handler(req, res) {
   } catch (err) {
     console.error('API Error:', err.message);
     return res.status(500).json({ error: 'Error interno', details: err.message });
+  }
+}
+
+// ── KEEP-ALIVE PING ───────────────────────────────────
+async function handlePing(req, res) {
+  if (req.method !== 'GET') return res.status(405).json({ error: 'Método no permitido' });
+  try {
+    const db = getSupabase();
+    // Consulta liviana para mantener activo el proyecto en Supabase
+    const { error } = await db.from('config').select('id').eq('id', 1).maybeSingle();
+    if (error) throw error;
+    const { date, time } = getNowColombia();
+    return res.status(200).json({ ok: true, message: 'Supabase activo', date, time });
+  } catch (err) {
+    return res.status(500).json({ ok: false, error: err.message });
   }
 }
 
