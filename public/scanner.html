@@ -231,9 +231,20 @@
 
     let studentId = decodedText;
     try {
-      const u = new URL(decodedText);
-      studentId = u.searchParams.get('id') || decodedText;
-    } catch {}
+      // Intentamos parsear como URL. Si falla (por ser solo UUID), el catch lo maneja.
+      if (decodedText.startsWith('http')) {
+        const u = new URL(decodedText);
+        studentId = u.searchParams.get('id') || decodedText;
+      }
+    } catch (e) {
+      console.warn("Error parsing QR URL, using raw text", e);
+    }
+
+    studentId = (studentId || '').trim();
+    if (!studentId || studentId.length < 5) {
+      setResult('error', '⚠️', 'Código inválido', 'El QR no contiene un ID válido');
+      return;
+    }
 
     await registerAttendance(studentId);
 
@@ -288,9 +299,15 @@
         setResult('duplicate', '⚠️', 'Ya registrado hoy', data.error);
         if (data.student?.photo_url) showPhotoOverlay(data.student, '⚠ Ya registró asistencia hoy');
       } else if (res.status === 400) {
-        setResult('error', '🔴', 'Escaneo apagado', data.error);
+        setResult('error', '🔴', 'Error de sesión', data.error || 'Escaneo apagado');
+      } else if (res.status === 401) {
+        setResult('error', '🔐', 'PIN inválido', 'Tu PIN de escáner no es correcto');
+        // Si el PIN es inválido, borramos el sessionStorage para forzar re-login
+        sessionStorage.removeItem('scanner_pin');
+      } else if (res.status === 404) {
+        setResult('error', '❓', 'No encontrado', 'El QR no corresponde a ningún estudiante');
       } else {
-        setResult('error', '❌', 'Error', data.error || 'Intenta de nuevo');
+        setResult('error', '❌', 'Error', data.error || 'Ocurrió un error en el servidor');
       }
     } catch {
       setResult('error', '❌', 'Sin conexión', 'Verifica la red');

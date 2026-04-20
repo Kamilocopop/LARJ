@@ -15,14 +15,15 @@ function getSupabase() {
 // ── HORA COLOMBIA (UTC-5) ─────────────────────────────
 function getNowColombia() {
   const now = new Date();
-  const date = new Intl.DateTimeFormat('en-CA', {
-    timeZone: 'America/Bogota',
-    year: 'numeric', month: '2-digit', day: '2-digit',
-  }).format(now); // → "YYYY-MM-DD"
-  const time = new Intl.DateTimeFormat('es-CO', {
-    timeZone: 'America/Bogota',
-    hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false,
-  }).format(now); // → "HH:mm:ss"
+  // Forzamos el locale 'en-CA' que suele ser YYYY-MM-DD, pero limpiamos cualquier caracter invisible
+  const options = { timeZone: 'America/Bogota', year: 'numeric', month: '2-digit', day: '2-digit' };
+  const dateStr = new Intl.DateTimeFormat('en-CA', options).format(now); // → "2024-04-20"
+  const date = dateStr.match(/\d{4}-\d{2}-\d{2}/)[0];
+
+  const timeOptions = { timeZone: 'America/Bogota', hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false };
+  const timeStr = new Intl.DateTimeFormat('en-GB', timeOptions).format(now); // en-GB es HH:mm:ss
+  const time = timeStr.match(/\d{2}:\d{2}:\d{2}/)[0];
+
   return { now, date, time };
 }
 
@@ -269,14 +270,21 @@ async function handleAttendance(req, res, sub) {
   }
 
   if (req.method === 'POST' && !sub) {
-    const { studentId, pin } = req.body || {};
+    const { studentId: bodyStudentId, pin } = req.body || {};
+    const studentId = (bodyStudentId || '').trim();
     if (!studentId) return res.status(400).json({ error: 'studentId requerido' });
     const cfg = await getConfig();
-    if (pin !== cfg.scanner_pin) return res.status(401).json({ error: 'PIN inválido' });
+    if (pin !== cfg.scanner_pin) {
+      console.warn(`Intento de registro con PIN inválido para: ${studentId}`);
+      return res.status(401).json({ error: 'PIN inválido' });
+    }
     const { data: session } = await db.from('sessions').select('id, name').eq('active', true).maybeSingle();
     if (!session) return res.status(400).json({ error: 'Escaneo apagado. El profesor debe activarlo.' });
     const { data: student } = await db.from('students').select('id, nombres, apellidos, codigo, photo_url').eq('id', studentId).maybeSingle();
-    if (!student) return res.status(404).json({ error: 'Estudiante no encontrado' });
+    if (!student) {
+      console.error(`Estudiante no encontrado: [${studentId}]`);
+      return res.status(404).json({ error: 'Estudiante no encontrado' });
+    }
     const { date, time } = getNowColombia();
     const { data, error } = await db
       .from('attendance')
