@@ -32,7 +32,8 @@ create table public.attendance (
   time       time not null default current_time,
   method     text default 'qr',
   created_at timestamptz default now(),
-  unique(student_id, session_id)
+  -- Un estudiante solo puede registrar UNA asistencia por día (sin importar la sesión).
+  unique(student_id, date)
 );
 
 -- ÍNDICES
@@ -64,7 +65,10 @@ create table public.config (
 -- Solo puede haber una fila
 alter table public.config enable row level security;
 
--- Insertar fila inicial (ajusta los valores que quieras)
+-- Insertar fila inicial.
+-- ⚠️ IMPORTANTE: cambia estos valores por unos seguros ANTES de usar la app,
+--    o hazlo desde el panel Admin → Configuración justo después del primer login.
+--    No dejes 'admin123' / '1234' en producción.
 insert into public.config (id, admin_token, scanner_pin) values (1, 'admin123', '1234')
 on conflict (id) do nothing;
 
@@ -91,3 +95,41 @@ create policy "Service role delete student photos"
 
 -- Agregar columna foto a estudiantes (si no existe)
 alter table public.students add column if not exists photo_url text;
+
+-- =============================================
+-- MIGRACIÓN: asistencia = 1 vez por estudiante por DÍA
+-- Ejecuta este bloque UNA VEZ si tu base ya existía con la
+-- restricción antigua unique(student_id, session_id).
+-- (Si creas la base desde cero con este archivo, ya queda aplicado.)
+-- =============================================
+
+-- 1) Quitar la restricción antigua (nombre autogenerado por Postgres)
+alter table public.attendance
+  drop constraint if exists attendance_student_id_session_id_key;
+
+-- 2) Eliminar duplicados existentes por (estudiante, día), conservando el más antiguo
+delete from public.attendance a
+using public.attendance b
+where a.student_id = b.student_id
+  and a.date       = b.date
+  and (a.created_at, a.id) > (b.created_at, b.id);
+
+-- 3) Crear la nueva unicidad (estudiante + fecha)
+create unique index if not exists attendance_student_date_uniq
+  on public.attendance(student_id, date);
+
+-- =============================================
+-- UTILIDAD: dejar UNA sola sesión activa
+-- Seguro de re-ejecutar. Cierra todas las sesiones activas menos la
+-- más reciente. Corrige el caso en que el escáner mostraba
+-- "desactivado" por haber varias filas con active=true.
+-- =============================================
+update public.sessions
+set active = false, closed_at = now()
+where active = true
+  and id <> (
+    select id from public.sessions
+    where active = true
+    order by opened_at desc
+    limit 1
+  );

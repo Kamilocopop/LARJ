@@ -13,6 +13,7 @@ Stack: **HTML puro + Vercel Functions + Supabase**
 | `SUPABASE_SERVICE_ROLE_KEY` | Service Role Key (bypasa RLS) |
 | `ADMIN_TOKEN` | Contraseña del panel admin (la eliges tú) |
 | `SCANNER_PIN` | PIN de 4 dígitos para el escáner |
+| `ALLOWED_ORIGINS` | (Opcional) Orígenes permitidos para CORS, separados por coma. Por defecto: `https://larj.vercel.app` |
 
 ---
 

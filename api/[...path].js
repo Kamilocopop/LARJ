@@ -1,6 +1,53 @@
 import { createClient } from '@supabase/supabase-js';
+import { timingSafeEqual } from 'node:crypto';
 
 let supabase = null;
+
+// ── ORÍGENES PERMITIDOS (CORS) ────────────────────────
+// Configurable con la variable de entorno ALLOWED_ORIGINS (separados por coma).
+// Si no se define, se usa la lista por defecto.
+const ALLOWED_ORIGINS = (process.env.ALLOWED_ORIGINS || 'https://larj.vercel.app')
+  .split(',')
+  .map(o => o.trim())
+  .filter(Boolean);
+
+function applyCors(req, res) {
+  const origin = req.headers.origin;
+  if (origin && ALLOWED_ORIGINS.includes(origin)) {
+    res.setHeader('Access-Control-Allow-Origin', origin);
+    res.setHeader('Vary', 'Origin');
+  }
+  res.setHeader('Access-Control-Allow-Methods', 'GET, POST, DELETE, OPTIONS');
+  res.setHeader('Access-Control-Allow-Headers', 'Content-Type, x-admin-token');
+}
+
+// ── COMPARACIÓN SEGURA (tiempo constante) ─────────────
+function safeEqual(a, b) {
+  const bufA = Buffer.from(String(a ?? ''), 'utf8');
+  const bufB = Buffer.from(String(b ?? ''), 'utf8');
+  if (bufA.length !== bufB.length) return false;
+  return timingSafeEqual(bufA, bufB);
+}
+
+// ── RATE LIMITING (best-effort, en memoria por instancia) ──
+// En serverless las instancias son efímeras; esto mitiga (no elimina)
+// la fuerza bruta dentro de una misma instancia caliente.
+const rateBuckets = new Map();
+function rateLimit(key, { max = 10, windowMs = 60_000 } = {}) {
+  const now = Date.now();
+  const entry = rateBuckets.get(key);
+  if (!entry || now > entry.reset) {
+    rateBuckets.set(key, { count: 1, reset: now + windowMs });
+    return true;
+  }
+  if (entry.count >= max) return false;
+  entry.count++;
+  return true;
+}
+function clientKey(req) {
+  const fwd = req.headers['x-forwarded-for'];
+  return (Array.isArray(fwd) ? fwd[0] : fwd || '').split(',')[0].trim() || 'unknown';
+}
 
 function getSupabase() {
   if (!supabase) {
@@ -43,13 +90,12 @@ async function checkAdmin(req) {
   const token = req.headers['x-admin-token'];
   if (!token) return false;
   const cfg = await getConfig();
-  return token === cfg.admin_token;
+  if (!cfg.admin_token) return false;
+  return safeEqual(token, cfg.admin_token);
 }
 
 export default async function handler(req, res) {
-  res.setHeader('Access-Control-Allow-Origin', '*');
-  res.setHeader('Access-Control-Allow-Methods', 'GET, POST, DELETE, OPTIONS');
-  res.setHeader('Access-Control-Allow-Headers', 'Content-Type, x-admin-token');
+  applyCors(req, res);
   if (req.method === 'OPTIONS') return res.status(200).end();
 
   const url      = new URL(req.url, `http://${req.headers.host}`);
@@ -140,14 +186,17 @@ async function handleUpload(req, res, sub) {
 // ── VERIFY PIN ────────────────────────────────────────
 async function verifyPin(req, res) {
   if (req.method !== 'POST') return res.status(405).json({ error: 'Método no permitido' });
+  if (!rateLimit(`verify-pin:${clientKey(req)}`, { max: 8, windowMs: 60_000 })) {
+    return res.status(429).json({ error: 'Demasiados intentos. Espera un momento.' });
+  }
   const { pin, isAdmin: adminLogin } = req.body || {};
   if (!pin) return res.status(400).json({ error: 'PIN requerido' });
   const cfg = await getConfig();
   if (adminLogin) {
-    if (pin === cfg.admin_token) return res.status(200).json({ ok: true });
+    if (cfg.admin_token && safeEqual(pin, cfg.admin_token)) return res.status(200).json({ ok: true });
     return res.status(401).json({ error: 'Contraseña incorrecta' });
   }
-  if (pin === cfg.scanner_pin) return res.status(200).json({ ok: true });
+  if (cfg.scanner_pin && safeEqual(pin, cfg.scanner_pin)) return res.status(200).json({ ok: true });
   return res.status(401).json({ error: 'PIN incorrecto' });
 }
 
@@ -204,8 +253,11 @@ async function handleStudents(req, res, sub) {
     try {
       const { data: student } = await db.from('students').select('photo_url').eq('id', id).maybeSingle();
       if (student?.photo_url) {
-        const filename = student.photo_url.split('/').pop();
-        await db.storage.from('student-photos').remove([filename]);
+        const urlObj = new URL(student.photo_url);
+        const pathParts = urlObj.pathname.split('/student-photos/');
+        if (pathParts[1]) {
+          await db.storage.from('student-photos').remove([decodeURIComponent(pathParts[1])]);
+        }
       }
     } catch {}
     const { error } = await db.from('students').delete().eq('id', id);
@@ -215,12 +267,24 @@ async function handleStudents(req, res, sub) {
   return res.status(405).json({ error: 'Método no permitido' });
 }
 
+// Lee la sesión activa tolerando duplicados: devuelve la MÁS RECIENTE.
+// Evita que maybeSingle() falle cuando hay >1 fila con active=true.
+async function getActiveSession(db, columns = '*') {
+  const { data } = await db
+    .from('sessions')
+    .select(columns)
+    .eq('active', true)
+    .order('opened_at', { ascending: false })
+    .limit(1);
+  return (data && data[0]) || null;
+}
+
 // ── SESSIONS ──────────────────────────────────────────
 async function handleSessions(req, res, sub) {
   const db = getSupabase();
   if (req.method === 'GET' && sub === 'active') {
-    const { data } = await db.from('sessions').select('*').eq('active', true).maybeSingle();
-    return res.status(200).json(data || null);
+    const session = await getActiveSession(db);
+    return res.status(200).json(session || null);
   }
   if (req.method === 'GET' && !sub) {
     const { data } = await db.from('sessions').select('*').order('opened_at', { ascending: false });
@@ -273,12 +337,15 @@ async function handleAttendance(req, res, sub) {
     const { studentId: bodyStudentId, pin } = req.body || {};
     const studentId = (bodyStudentId || '').trim();
     if (!studentId) return res.status(400).json({ error: 'studentId requerido' });
+    if (!rateLimit(`attendance:${clientKey(req)}`, { max: 30, windowMs: 60_000 })) {
+      return res.status(429).json({ error: 'Demasiadas solicitudes. Espera un momento.' });
+    }
     const cfg = await getConfig();
-    if (pin !== cfg.scanner_pin) {
+    if (!cfg.scanner_pin || !safeEqual(pin, cfg.scanner_pin)) {
       console.warn(`Intento de registro con PIN inválido para: ${studentId}`);
       return res.status(401).json({ error: 'PIN inválido' });
     }
-    const { data: session } = await db.from('sessions').select('id, name').eq('active', true).maybeSingle();
+    const session = await getActiveSession(db, 'id, name');
     if (!session) return res.status(400).json({ error: 'Escaneo apagado. El profesor debe activarlo.' });
     const { data: student } = await db.from('students').select('id, nombres, apellidos, codigo, photo_url').eq('id', studentId).maybeSingle();
     if (!student) {

@@ -13,7 +13,9 @@
 <link rel="apple-touch-icon" href="/icons/icon-192.png">
 <link rel="icon" type="image/png" sizes="192x192" href="/icons/icon-192.png">
 <link href="https://fonts.googleapis.com/css2?family=DM+Serif+Display&family=DM+Mono:wght@400;500&family=DM+Sans:wght@300;400;500;600&display=swap" rel="stylesheet">
-<script src="https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js"></script>
+<script src="https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js"
+        integrity="sha384-c9d8RFSL+u3exBOJ4Yp3HUJXS4znl9f+z66d1y54ig+ea249SpqR+w1wyvXz/lk+"
+        crossorigin="anonymous" referrerpolicy="no-referrer"></script>
 <style>
   *{margin:0;padding:0;box-sizing:border-box}
   :root{--bg:#0d1117;--surface:#161b22;--surface2:#21262d;--border:#30363d;--accent:#3fb950;--blue:#58a6ff;--danger:#f78166;--gold:#d29922;--muted:#8b949e;--text:#e6edf3}
@@ -190,6 +192,7 @@
       sessionStorage.setItem('scanner_pin', val);
       openScanner();
     } else {
+      err.textContent = '⚠ PIN incorrecto.';
       err.style.display = 'block';
       document.getElementById('pin-input').value = '';
     }
@@ -301,9 +304,10 @@
       } else if (res.status === 400) {
         setResult('error', '🔴', 'Error de sesión', data.error || 'Escaneo apagado');
       } else if (res.status === 401) {
-        setResult('error', '🔐', 'PIN inválido', 'Tu PIN de escáner no es correcto');
-        // Si el PIN es inválido, borramos el sessionStorage para forzar re-login
+        // El PIN cambió (o es incorrecto): volvemos a la pantalla de PIN.
         sessionStorage.removeItem('scanner_pin');
+        backToPin('El PIN cambió. Ingrésalo de nuevo.');
+        return;
       } else if (res.status === 404) {
         setResult('error', '❓', 'No encontrado', 'El QR no corresponde a ningún estudiante');
       } else {
@@ -345,9 +349,39 @@
     window.location.href = '/index.html';
   }
 
-  // Auto-login si hay PIN guardado
+  // ── VOLVER A LA PANTALLA DE PIN ──────────────────
+  function backToPin(msg) {
+    if (pollInterval) clearInterval(pollInterval);
+    if (html5QrCode && html5QrCode.isScanning) {
+      html5QrCode.stop().catch(() => {});
+    }
+    html5QrCode = null;
+    pin = '';
+    locked = false;
+    document.getElementById('scanner-screen').style.display = 'none';
+    document.getElementById('pin-screen').style.display     = 'block';
+    const err = document.getElementById('pin-error');
+    if (msg) { err.textContent = '⚠ ' + msg; err.style.display = 'block'; }
+    const input = document.getElementById('pin-input');
+    input.value = '';
+    input.focus();
+  }
+
+  // Auto-login si hay PIN guardado (se valida contra el servidor antes de abrir)
   const savedPin = sessionStorage.getItem('scanner_pin');
-  if (savedPin) { pin = savedPin; openScanner(); }
+  if (savedPin) {
+    fetch('/api/verify-pin', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ pin: savedPin })
+    }).then(res => {
+      if (res.ok) { pin = savedPin; openScanner(); }
+      else { sessionStorage.removeItem('scanner_pin'); }
+    }).catch(() => {
+      // Sin conexión: intentamos abrir con el PIN guardado igualmente
+      pin = savedPin; openScanner();
+    });
+  }
 
   // Registrar Service Worker
   if ('serviceWorker' in navigator) {

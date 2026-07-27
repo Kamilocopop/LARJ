@@ -12,8 +12,9 @@
 <meta name="apple-mobile-web-app-title" content="La RJ">
 <link rel="apple-touch-icon" href="/icons/icon-192.png">
 <link rel="icon" type="image/png" sizes="192x192" href="/icons/icon-192.png">
-<script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js">
-</script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"
+        integrity="sha384-3zSEDfvllQohrq0PHL1fOXJuC/jSOO34H46t6UQfobFOmxE5BpjjaIJY5F2/bMnU"
+        crossorigin="anonymous" referrerpolicy="no-referrer"></script>
 <link href="https://fonts.googleapis.com/css2?family=DM+Serif+Display&family=DM+Mono:wght@400;500&family=DM+Sans:wght@300;400;500;600&display=swap" rel="stylesheet">
 <style>
   *{margin:0;padding:0;box-sizing:border-box;-webkit-tap-highlight-color:transparent}
@@ -406,8 +407,9 @@ async function loadAll() {
   students = Array.isArray(studentsRes) ? studentsRes : [];
   document.getElementById('students-count').textContent = `${students.length} estudiantes registrados`;
 
-  // Attendance today
-  const today = new Date().toISOString().split('T')[0];
+  // Attendance today — usa la fecha de Colombia (igual que el servidor),
+  // no la fecha UTC, para no marcar ausentes por la noche.
+  const today = new Intl.DateTimeFormat('en-CA', { timeZone: 'America/Bogota' }).format(new Date());
   presentToday = new Set((Array.isArray(attRes)?attRes:[]).filter(r=>r.date===today).map(r=>r.student_id));
 
   renderStudents();
@@ -437,19 +439,31 @@ function updateSessionBtn() {
   }
 }
 
+let sessionBusy = false;
 async function toggleSession() {
-  if (activeSession) {
-    await DEL('/api/sessions');
-    activeSession = null;
-    showToast('🔒','Escaneo desactivado','ok');
-  } else {
-    const res  = await POST('/api/sessions', { name: 'Clase' });
-    const data = await res.json();
-    activeSession = data;
-    showToast('✅','Escaneo activado','ok');
+  if (sessionBusy) return;              // evita doble clic → sesiones duplicadas
+  sessionBusy = true;
+  const btn = document.getElementById('session-btn');
+  btn.disabled = true;
+  try {
+    if (activeSession) {
+      const res = await DEL('/api/sessions');
+      if (!res.ok) { showToast('⚠','No se pudo desactivar','err'); return; }
+      activeSession = null;
+      showToast('🔒','Escaneo desactivado','ok');
+    } else {
+      const res  = await POST('/api/sessions', { name: 'Clase' });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) { showToast('⚠', data.error || 'No se pudo activar','err'); return; }
+      activeSession = data;             // solo se asigna si la respuesta fue OK
+      showToast('✅','Escaneo activado','ok');
+    }
+    updateSessionBtn();
+    await loadAll();                    // re-sincroniza con el servidor (fuente de verdad)
+  } finally {
+    sessionBusy = false;
+    btn.disabled = false;
   }
-  updateSessionBtn();
-  await loadAll();
 }
 
 // ─── STUDENTS ────────────────────────────────────────
@@ -465,24 +479,24 @@ function renderStudents(filter='') {
   }
   const colors=['#3fb950','#58a6ff','#d29922','#f78166','#79c0ff'];
   tbody.innerHTML = list.map(s => {
-    const init = (s.nombres[0]+(s.apellidos[0]||'')).toUpperCase();
+    const init = ((s.nombres?.[0]||'')+(s.apellidos?.[0]||'')).toUpperCase() || '?';
     const col  = colors[s.id.charCodeAt(s.id.length-1)%colors.length];
     const pres = presentToday.has(s.id);
     const avatarHtml = s.photo_url
-      ? `<img src="${s.photo_url}" style="width:30px;height:30px;border-radius:7px;object-fit:cover;flex-shrink:0">`
-      : `<div class="avatar" style="background:${col}">${init}</div>`;
+      ? `<img src="${escapeHtml(s.photo_url)}" style="width:30px;height:30px;border-radius:7px;object-fit:cover;flex-shrink:0">`
+      : `<div class="avatar" style="background:${col}">${escapeHtml(init)}</div>`;
     return `<tr>
       <td><div class="student-cell">
         ${avatarHtml}
-        <div><strong style="font-size:13px">${s.nombres} ${s.apellidos}</strong><br><small style="color:var(--muted);font-family:'DM Mono',monospace;font-size:10px">${s.id.slice(0,8)}…</small></div>
+        <div><strong style="font-size:13px">${escapeHtml(s.nombres)} ${escapeHtml(s.apellidos)}</strong><br><small style="color:var(--muted);font-family:'DM Mono',monospace;font-size:10px">${escapeHtml(s.id.slice(0,8))}…</small></div>
       </div></td>
-      <td class="hide-mobile" style="font-family:'DM Mono',monospace;font-size:12px;color:var(--muted)">${s.codigo||'—'}</td>
-      <td class="hide-mobile"><span style="padding:2px 9px;border-radius:20px;font-size:11px;background:var(--surface2);border:1px solid var(--border);color:var(--muted)">${s.grupo||'—'}</span></td>
+      <td class="hide-mobile" style="font-family:'DM Mono',monospace;font-size:12px;color:var(--muted)">${escapeHtml(s.codigo||'—')}</td>
+      <td class="hide-mobile"><span style="padding:2px 9px;border-radius:20px;font-size:11px;background:var(--surface2);border:1px solid var(--border);color:var(--muted)">${escapeHtml(s.grupo||'—')}</span></td>
       <td>${pres?'<span class="badge badge-green">✓ Presente</span>':'<span class="badge badge-red">✗ Ausente</span>'}</td>
       <td><div style="display:flex;gap:6px">
         <button class="btn-sm" onclick="triggerPhotoUpload('${s.id}')">📷</button>
         <button class="btn-sm" onclick="showQRById('${s.id}')">QR</button>
-        <button class="btn-sm btn-danger-sm" onclick="deleteStudent('${s.id}','${s.nombres} ${s.apellidos}')">✕</button>
+        <button class="btn-sm btn-danger-sm" onclick="deleteStudent('${s.id}')">✕</button>
       </div></td>
     </tr>`;
   }).join('');
@@ -517,7 +531,9 @@ async function addStudent() {
   btn.disabled = false; btn.textContent = '✅ Registrar estudiante';
 }
 
-async function deleteStudent(id, name) {
+async function deleteStudent(id) {
+  const s = students.find(s => s.id === id);
+  const name = s ? `${s.nombres} ${s.apellidos}` : 'este estudiante';
   if (!confirm(`¿Eliminar a ${name}?`)) return;
   await DEL('/api/students',{id});
   students = students.filter(s=>s.id!==id);
@@ -583,11 +599,11 @@ function printQR() {
   const imgEl  = container.querySelector('img') || container.querySelector('canvas');
   const img    = imgEl ? (imgEl.tagName === 'CANVAS' ? imgEl.toDataURL('image/png') : imgEl.src) : '';
   const win    = window.open('','_blank');
-  win.document.write(`<html><head><title>QR - ${currentQR.name}</title>
+  win.document.write(`<html><head><title>QR - ${escapeHtml(currentQR.name)}</title>
     <style>body{display:flex;flex-direction:column;align-items:center;justify-content:center;min-height:100vh;font-family:sans-serif}
     h2{margin:0 0 4px;font-size:18px}p{color:#666;font-size:13px;margin:0 0 16px}</style></head>
-    <body><h2>${currentQR.name}</h2><p>${currentQR.codigo||''}</p><img src="${img}"/>
-    <p style="margin-top:10px;font-size:10px;color:#999">${currentQR.id}</p>
+    <body><h2>${escapeHtml(currentQR.name)}</h2><p>${escapeHtml(currentQR.codigo||'')}</p><img src="${escapeHtml(img)}"/>
+    <p style="margin-top:10px;font-size:10px;color:#999">${escapeHtml(currentQR.id)}</p>
     <script>window.onload=()=>window.print()<\/script></body></html>`);
   win.document.close();
 }
@@ -607,12 +623,12 @@ function renderAttendance() {
     const s = r.students;
     return `<tr>
       <td class="hide-mobile" style="color:var(--muted);font-family:'DM Mono',monospace;font-size:11px">${i+1}</td>
-      <td><strong>${s?`${s.nombres} ${s.apellidos}`:'—'}</strong></td>
-      <td class="hide-mobile" style="font-family:'DM Mono',monospace;font-size:11px;color:var(--muted)">${s?.codigo||'—'}</td>
+      <td><strong>${s?`${escapeHtml(s.nombres)} ${escapeHtml(s.apellidos)}`:'—'}</strong></td>
+      <td class="hide-mobile" style="font-family:'DM Mono',monospace;font-size:11px;color:var(--muted)">${escapeHtml(s?.codigo||'—')}</td>
       <td style="font-family:'DM Mono',monospace;font-size:12px">${fmtDate(r.date)}</td>
-      <td><span class="badge badge-gold" style="font-family:'DM Mono',monospace">${r.time}</span></td>
-      <td class="hide-mobile" style="font-size:12px;color:var(--muted)">${r.sessions?.name||'—'}</td>
-      <td class="hide-mobile"><span class="badge ${r.method==='qr'?'badge-blue':'badge-green'}" style="font-family:'DM Mono',monospace">${r.method}</span></td>
+      <td><span class="badge badge-gold" style="font-family:'DM Mono',monospace">${escapeHtml(r.time)}</span></td>
+      <td class="hide-mobile" style="font-size:12px;color:var(--muted)">${escapeHtml(r.sessions?.name||'—')}</td>
+      <td class="hide-mobile"><span class="badge ${r.method==='qr'?'badge-blue':'badge-green'}" style="font-family:'DM Mono',monospace">${escapeHtml(r.method)}</span></td>
     </tr>`;
   }).join('');
 }
@@ -637,10 +653,10 @@ function renderRecentLog(recent) {
     const s = r.students;
     return `<div class="tl-item">
       ${r.students?.photo_url
-        ? `<img src="${r.students.photo_url}" style="width:28px;height:28px;border-radius:6px;object-fit:cover;flex-shrink:0">`
+        ? `<img src="${escapeHtml(r.students.photo_url)}" style="width:28px;height:28px;border-radius:6px;object-fit:cover;flex-shrink:0">`
         : '<div class="tl-dot"></div>'}
-      <div class="tl-time">${r.time}</div>
-      <div><div class="tl-name">${s?`${s.nombres} ${s.apellidos}`:'—'}</div>
+      <div class="tl-time">${escapeHtml(r.time)}</div>
+      <div><div class="tl-name">${s?`${escapeHtml(s.nombres)} ${escapeHtml(s.apellidos)}`:'—'}</div>
       <div class="tl-detail">${fmtDate(r.date)} · QR</div></div>
       <span class="badge badge-green" style="margin-left:auto">✓</span>
     </div>`;
@@ -679,9 +695,9 @@ function renderReports() {
     const [bg, st] = s.attended > 0 ? ['badge-green', '✓ Asistió'] : ['badge-red', '✗ Sin asistencias'];
     return `<tr>
       <td style="font-size:18px">${medals[i] || '#'+(i+1)}</td>
-      <td><strong>${s.nombres} ${s.apellidos}</strong><br>
-          <small style="color:var(--muted);font-family:'DM Mono',monospace;font-size:10px">${s.codigo||''}</small></td>
-      <td><span style="padding:2px 9px;border-radius:20px;font-size:11px;background:var(--surface2);border:1px solid var(--border);color:var(--muted)">${s.grupo||'—'}</span></td>
+      <td><strong>${escapeHtml(s.nombres)} ${escapeHtml(s.apellidos)}</strong><br>
+          <small style="color:var(--muted);font-family:'DM Mono',monospace;font-size:10px">${escapeHtml(s.codigo||'')}</small></td>
+      <td><span style="padding:2px 9px;border-radius:20px;font-size:11px;background:var(--surface2);border:1px solid var(--border);color:var(--muted)">${escapeHtml(s.grupo||'—')}</span></td>
       <td><span class="badge badge-blue" style="font-size:14px;padding:4px 12px">${s.attended} ${s.attended === 1 ? 'día' : 'días'}</span></td>
       <td><span class="badge ${bg}">${st}</span></td>
     </tr>`;
@@ -689,11 +705,14 @@ function renderReports() {
 }
 
 function exportReportCSV() {
+  // Días únicos asistidos por estudiante (coincide con la tabla de reportes)
   const attByStudent = {};
-  attendance.forEach(r => { attByStudent[r.student_id] = (attByStudent[r.student_id]||0)+1; });
-  const rows = [['Nombres','Apellidos','Código','Grupo','Asistencias','Sesiones totales','% Asistencia'],
+  attendance.forEach(r => {
+    (attByStudent[r.student_id] = attByStudent[r.student_id] || new Set()).add(r.date);
+  });
+  const rows = [['Nombres','Apellidos','Código','Grupo','Días asistidos','Sesiones totales','% Asistencia'],
     ...students.map(s=>{
-      const att = attByStudent[s.id]||0;
+      const att = attByStudent[s.id] ? attByStudent[s.id].size : 0;
       const pct = sessions.length>0?Math.round(att/sessions.length*100):0;
       return [s.nombres,s.apellidos,s.codigo||'',s.grupo||'',att,sessions.length,pct+'%'];
     })];
@@ -701,6 +720,12 @@ function exportReportCSV() {
 }
 
 // ─── UTILS ───────────────────────────────────────────
+// Escapa texto para insertarlo de forma segura vía innerHTML (previene XSS)
+function escapeHtml(s) {
+  return String(s ?? '').replace(/[&<>"']/g, c => ({
+    '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'
+  }[c]));
+}
 function fmtDate(d) {
   if (!d) return '—';
   const [y,m,day]=d.split('-'); return `${day}/${m}/${y}`;
